@@ -1,6 +1,6 @@
 PROJECT=router
-C_SOURCES=router.c lib/queue.c lib/list.c lib/lib.c
-CPP_SOURCES=
+C_SOURCES=lib/lib.c
+CPP_SOURCES=main.cpp
 LIBRARY=nope
 INCPATHS=include
 LIBPATHS=.
