@@ -15,7 +15,7 @@ constexpr bool invocable(Fn &&fn, Args &&...args) noexcept {
 }
 
 namespace endianness {
-using namespace routing::util;
+using namespace router::util;
 
 TEST_CASE("Host to Network Order::uint16_t") {
   uint16_t value = 0x1234;
@@ -51,7 +51,7 @@ TEST_CASE("Host to Network Order::invalid type") {
 } // namespace endianness
 
 namespace serialization {
-using namespace routing::util;
+using namespace router::util;
 
 struct POD {
   uint16_t a;

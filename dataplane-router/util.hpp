@@ -9,7 +9,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace routing::util {
+namespace router::util {
 
 namespace concepts {
 template <typename T> struct is_tuple : std::false_type {};
@@ -241,4 +241,4 @@ T deserialize_tuple(std::span<std::byte, N> buffer)
   return result;
 }
 
-} // namespace routing::util
+} // namespace router::util
