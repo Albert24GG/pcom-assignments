@@ -1,6 +1,6 @@
 PROJECT=router
-C_SOURCES=lib/lib.c
-CPP_SOURCES=main.cpp
+C_SOURCES=
+CPP_SOURCES=main.cpp lib/lib.cpp logger.cpp
 LIBRARY=nope
 INCPATHS=include
 LIBPATHS=.

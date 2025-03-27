@@ -1,9 +1,5 @@
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -109,7 +105,3 @@ void init(char *argv[], int argc);
       exit(1);                                                                 \
     }                                                                          \
   } while (0)
-
-#ifdef __cplusplus
-}
-#endif
