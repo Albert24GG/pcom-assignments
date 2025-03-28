@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/stdout_sinks.h>
 
 namespace {
 
@@ -12,13 +13,27 @@ logger::Level global_level{logger::Level::info};
 
 namespace logger {
 
-void init(const std::filesystem::path &log_file) {
+void init(const std::filesystem::path &log_file, bool disable_stdout) {
   if (global_logger) {
     throw std::runtime_error("Logger already initialized");
   }
 
   if (global_level != Level::off) {
-    global_logger = spdlog::basic_logger_mt("router-logger", log_file);
+    auto log_level = static_cast<spdlog::level::level_enum>(global_level);
+
+    if (disable_stdout) {
+      global_logger = spdlog::basic_logger_mt("router-logger", log_file);
+    } else {
+      auto console_sink = std::make_shared<spdlog::sinks::stdout_sink_mt>();
+      console_sink->set_level(log_level);
+
+      auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
+          log_file.string(), true);
+      file_sink->set_level(log_level);
+
+      global_logger = std::make_shared<spdlog::logger>(
+          "router-logger", spdlog::sinks_init_list{console_sink, file_sink});
+    }
     global_logger->set_level(
         static_cast<spdlog::level::level_enum>(global_level));
   }

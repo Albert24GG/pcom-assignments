@@ -31,8 +31,10 @@ enum class Level {
  *
  * @param log_dir The directory where the log file will be stored
  * @param log_name The name of the log file
+ * @param disable_stdout If true, the logger will not log to stdout
  */
-void init(const std::filesystem::path &log_file = "./log.txt");
+void init(const std::filesystem::path &log_file = "./log.txt",
+          bool disable_stdout = false);
 
 /**
  * @brief Get the instance of the logger
