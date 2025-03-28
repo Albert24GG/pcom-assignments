@@ -1,18 +1,16 @@
 PROJECT=router
-C_SOURCES=
-CPP_SOURCES=main.cpp lib/lib.cpp logger.cpp
+SOURCES=main.cpp lib/lib.c logger.cpp
 LIBRARY=nope
 INCPATHS=include
 LIBPATHS=.
 LDFLAGS=
 CFLAGS=-c -Wall -Werror -Wno-error=unused-variable
-CXXFLAGS=-c -Wall -Werror -Wno-error=unused-variable -std=c++20
+CXXFLAGS=-c -Wall -Werror -Wno-error=unused-variable -std=c++17
 CC=gcc
 CXX=g++
 
 # Automatic generation of some important lists
-OBJECTS=$(C_SOURCES:.c=.o)
-OBJECTS+=$(CPP_SOURCES:.cpp=.o)
+OBJECTS=$(patsubst %.c, %.o, $(patsubst %.cpp, %.o, $(SOURCES)))
 INCFLAGS=$(foreach TMP,$(INCPATHS),-I$(TMP))
 LIBFLAGS=$(foreach TMP,$(LIBPATHS),-L$(TMP))
 
