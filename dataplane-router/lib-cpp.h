@@ -1,9 +1,12 @@
 #pragma once
 
+#include <array>
+#include <filesystem>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <vector>
 
 #define MAX_PACKET_LEN 1400
 #define ROUTER_NUM_INTERFACES 3
@@ -36,12 +39,12 @@ struct route_table_entry {
   uint32_t next_hop;
   uint32_t mask;
   int interface;
-} __attribute__((packed));
+};
 
 /* ARP table entry when skipping the ARP exercise */
 struct arp_table_entry {
   uint32_t ip;
-  uint8_t mac[6];
+  std::array<uint8_t, 6> mac;
 };
 
 char *get_interface_ip(int interface);
@@ -75,24 +78,41 @@ void get_interface_mac(size_t interface, uint8_t *mac);
 uint16_t checksum(uint16_t *data, size_t length);
 
 /**
- * hwaddr_aton - Convert ASCII string to MAC address (colon-delimited format)
- * @txt: MAC address as a string (e.g., "00:11:22:33:44:55")
- * @addr: Buffer for the MAC address (ETH_ALEN = 6 bytes)
- * Returns: 0 on success, -1 on failure (e.g., string not a MAC address)
+ * @brief Parses a MAC address from a string and returns it as an array of 6
+ * bytes.
+ *
+ * @param mac_str The MAC address string in the format "XX:XX:XX:XX:XX:XX".
+ * @return An array of 6 bytes representing the MAC address.
+ *
+ * @throws std::runtime_error if the format is invalid.
  */
-int hwaddr_aton(const char *txt, uint8_t *addr);
+std::array<uint8_t, 6> parse_mac_address(std::string_view mac_str);
 
-/* Populates a route table from file, rtable should be allocated
- * e.g. rtable = malloc(sizeof(struct route_table_entry) * 80000);
- * This function returns the size of the route table.
+/**
+ * @brief Parses a route table from path and returns a vector of
+ * route_table_entry.
+ *
+ * @param filename Path to the file containing the route table.
+ * @return A vector of route_table_entry structures.
+ *
+ * @throws std::runtime_error if the file cannot be opened or if the format
+ *         is invalid.
  */
-int read_rtable(const char *path, struct route_table_entry *rtable);
+std::vector<route_table_entry>
+parse_route_table(const std::filesystem::path &filename);
 
-/* Parses a static mac table from path and populates arp_table.
- * arp_table should be allocated and have enough space. This
- * function returns the size of the arp table.
- * */
-int parse_arp_table(char *path, struct arp_table_entry *arp_table);
+/**
+  * @brief Parses a static mac table from path and returns a vector of
+  * arp_table_entry.
+
+  * @param filename Path to the file containing the ARP table.
+  * @return A vector of arp_table_entry structures.
+
+  * @throws std::runtime_error if the file cannot be opened or if the format
+  *         is invalid.
+*/
+std::vector<arp_table_entry>
+parse_arp_table(const std::filesystem::path &filename);
 
 void init(char *argv[], int argc);
 
