@@ -1,19 +1,60 @@
-#include "lib.h"
-#include "protocols.h"
+#include "logger.hpp"
+#include "router.hpp"
+#include "span.hpp"
+#include <vector>
+
+static constexpr size_t MAX_ROUTING_TABLE_SIZE = 1e5;
 
 int main(int argc, char *argv[]) {
-  char buf[MAX_PACKET_LEN];
+  // c buf[MAX_PACKET_LEN];
+  std::array<std::byte, MAX_PACKET_LEN> buf;
+
+  const char *rtable_path = argv[1];
 
   // Do not modify this line
   init(argv + 2, argc - 2);
 
-  while (true) {
+  // Initialize the logger
+  logger::set_level(logger::Level::debug);
+  logger::init();
+  LOG_INFO("Router started");
 
+  // Read the routing table
+  std::vector<struct route_table_entry> rtable(MAX_ROUTING_TABLE_SIZE);
+
+  int rtable_size = read_rtable(rtable_path, rtable.data());
+  rtable.resize(rtable_size);
+  LOG_INFO("Routing table read with {} entries", rtable_size);
+
+#ifdef DEBUG
+  uint32_t prefix = rtable[0].prefix;
+  uint32_t mask = rtable[0].mask;
+  uint32_t next_hop = rtable[0].next_hop;
+  int interface = rtable[0].interface;
+  LOG_DEBUG("First route entry prefix: {:x} mask: {:x} next_hop: {:x} "
+            "interface: {}",
+            prefix, mask, next_hop, interface);
+#endif
+
+  // Temporary: Read static arp table
+  std::array<struct arp_table_entry, 6> arp_table;
+  static_cast<void>(
+      parse_arp_table(const_cast<char *>("arp_table.txt"), arp_table.data()));
+
+  // Initialize the router
+  router::Router router(rtable, arp_table);
+
+  while (true) {
     size_t interface;
     size_t len;
 
-    interface = recv_from_any_link(buf, &len);
+    interface = recv_from_any_link(reinterpret_cast<char *>(buf.data()), &len);
     DIE(interface < 0, "recv_from_any_links");
+
+    auto frame = tcb::span<std::byte>(buf.data(), len);
+    LOG_DEBUG("Received frame of size {} on interface {}", len, interface);
+
+    router.handle_frame(frame, interface);
 
     // TODO: Implement the router forwarding logic
 

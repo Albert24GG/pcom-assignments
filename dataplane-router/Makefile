@@ -1,11 +1,11 @@
 PROJECT=router
-SOURCES=main.cpp lib/lib.c logger.cpp
+SOURCES=main.cpp lib/lib.c logger.cpp router.cpp
 LIBRARY=nope
 INCPATHS=include
 LIBPATHS=.
 LDFLAGS=
 CFLAGS=-c -Wall -Werror -Wno-error=unused-variable
-CXXFLAGS=-c -Wall -Werror -Wno-error=unused-variable -std=c++17
+CXXFLAGS=-c -Wall -Werror -Wno-error=unused-variable -std=c++17 -DDEBUG
 CC=gcc
 CXX=g++
 
