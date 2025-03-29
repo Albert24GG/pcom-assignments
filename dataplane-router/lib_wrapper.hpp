@@ -1,7 +1,6 @@
 #pragma once
 
 #include <arpa/inet.h>
-#include <cstdint>
 extern "C" {
 #include "lib.h"
 #include "protocols.h"

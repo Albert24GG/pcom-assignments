@@ -144,22 +144,7 @@ void Router::handle_forward_ip_packet(tcb::span<std::byte> frame,
   uint32_t dest_ip = ip_hdr->dest_addr;
 
   LOG_DEBUG("Destination IP: {:x}", dest_ip);
-  // TODO: Use trie to find the next hop
-  auto lookup_next_hop = [](uint32_t dest_ip,
-                            const std::vector<route_table_entry> &rtable)
-      -> std::optional<std::pair<uint32_t, uint32_t>> {
-    std::optional<std::pair<uint32_t, uint32_t>> next_hop;
-    uint32_t best_mask = 0;
-    for (const auto &entry : rtable) {
-      if ((dest_ip & entry.mask) == entry.prefix && entry.mask > best_mask) {
-        best_mask = entry.mask;
-        next_hop = std::make_pair(entry.next_hop, entry.interface);
-      }
-    }
-    return next_hop;
-  };
-
-  auto next_hop = lookup_next_hop(dest_ip, route_table);
+  auto next_hop = get_next_hop(dest_ip);
   if (!next_hop) {
     LOG_ERROR("No matching route found. Dropping packet");
     // TODO: Send ICMP destination unreachable message
@@ -184,7 +169,7 @@ void Router::send_frame(tcb::span<std::byte> frame, iface_t interface,
   eth_hdr->ethr_type = util::ntoh(eth_type);
 
   // Send the frame
-  LOG_DEBUG("Sending frame to interface {}: {:x}", interface,
+  LOG_DEBUG("Sending frame to interface {}: {:xpn}", interface,
             spdlog::to_hex(dest_mac));
   send_to_link(frame.size(), reinterpret_cast<char *>(frame.data()), interface);
 }
