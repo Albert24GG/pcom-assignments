@@ -26,6 +26,18 @@ void recompute_checksum(struct ip_hdr *ip_hdr_p) {
 }
 } // namespace
 
+Router::Router(const std::vector<struct route_table_entry> &rtable,
+               const std::array<struct arp_table_entry, 6> &arp) {
+  for (const auto &entry : arp) {
+    std::array<uint8_t, 6> mac;
+    std::copy(std::begin(entry.mac), std::end(entry.mac), mac.begin());
+    arp_table_.emplace(entry.ip, mac);
+  }
+
+  auto rtable_entries = tcb::span(rtable);
+  rtable_.add_entries(rtable_entries);
+}
+
 std::optional<std::pair<uint32_t, Router::iface_t>>
 Router::get_next_hop(uint32_t dest_ip) {
   auto entry = rtable_.lookup(dest_ip);

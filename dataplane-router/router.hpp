@@ -15,16 +15,7 @@ public:
   using iface_t = size_t;
 
   Router(const std::vector<struct route_table_entry> &rtable,
-         const std::array<struct arp_table_entry, 6> &arp) {
-    for (const auto &entry : arp) {
-      std::array<uint8_t, 6> mac;
-      std::copy(std::begin(entry.mac), std::end(entry.mac), mac.begin());
-      arp_table_.emplace(entry.ip, mac);
-    }
-
-    auto rtable_entries = tcb::span(rtable);
-    rtable_.add_entries(rtable_entries);
-  }
+         const std::array<struct arp_table_entry, 6> &arp);
 
   void handle_frame(tcb::span<std::byte> frame, iface_t interface);
 
