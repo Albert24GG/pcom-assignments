@@ -1,5 +1,5 @@
 PROJECT=router
-SOURCES=main.cpp lib/lib.c logger.cpp router.cpp routing-table.cpp
+SOURCES=main.cpp lib/lib.c logger.cpp router.cpp routing-table.cpp arp-table.cpp
 LIBRARY=nope
 INCPATHS=include
 LIBPATHS=.

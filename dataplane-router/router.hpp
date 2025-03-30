@@ -1,21 +1,26 @@
 #pragma once
 
+#include "arp-table.hpp"
+#include "common.hpp"
 #include "lib_wrapper.hpp"
 #include "routing-table.hpp"
 #include "span.hpp"
 #include "util.hpp"
 #include <cstdint>
 #include <unordered_map>
-#include <vector>
 
 namespace router {
 
 class Router {
 public:
-  using iface_t = size_t;
+  void add_rtable_entry(RoutingTable::RoutingTableEntry entry) {
+    rtable_.add_entry(entry);
+  }
 
-  Router(const std::vector<struct route_table_entry> &rtable,
-         const std::array<struct arp_table_entry, 6> &arp);
+  void
+  add_rtable_entries(tcb::span<const RoutingTable::RoutingTableEntry> entries) {
+    rtable_.add_entries(entries);
+  }
 
   void handle_frame(tcb::span<std::byte> frame, iface_t interface);
 
@@ -27,6 +32,11 @@ private:
   void handle_forward_ip_packet(tcb::span<std::byte> frame, iface_t interface);
   void send_frame(tcb::span<std::byte> frame, iface_t interface,
                   uint32_t dest_ip, uint16_t eth_type);
+  void send_arp_request(uint32_t dest_ip, iface_t interface);
+  void send_arp_reply(uint32_t dest_ip, iface_t interface,
+                      const std::array<uint8_t, 6> &dest_mac);
+  void handle_arp_reply(tcb::span<std::byte> frame, iface_t interface);
+  void handle_arp_request(tcb::span<std::byte> frame, iface_t interface);
 
   struct interface_info {
     uint32_t ip;
@@ -46,7 +56,7 @@ private:
   std::optional<std::pair<uint32_t, iface_t>> get_next_hop(uint32_t dest_ip);
 
   RoutingTable rtable_{};
-  std::unordered_map<uint32_t, std::array<uint8_t, 6>> arp_table_{};
+  arp::ArpTable arp_table_{};
   std::unordered_map<iface_t, interface_info> interface_ip_map_{};
 };
 

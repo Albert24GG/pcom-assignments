@@ -36,13 +36,9 @@ int main(int argc, char *argv[]) {
             prefix, mask, next_hop, interface);
 #endif
 
-  // Temporary: Read static arp table
-  std::array<struct arp_table_entry, 6> arp_table;
-  static_cast<void>(
-      parse_arp_table(const_cast<char *>("arp_table.txt"), arp_table.data()));
-
   // Initialize the router
-  router::Router router(rtable, arp_table);
+  router::Router router{};
+  router.add_rtable_entries(rtable);
 
   while (true) {
     size_t interface;

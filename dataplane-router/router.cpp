@@ -1,4 +1,5 @@
 #include "router.hpp"
+#include "common.hpp"
 #include "lib_wrapper.hpp"
 #include "logger.hpp"
 #include "util.hpp"
@@ -24,21 +25,62 @@ void recompute_checksum(struct ip_hdr *ip_hdr_p) {
   ip_hdr_p->checksum = util::hton(
       checksum(reinterpret_cast<uint16_t *>(ip_hdr_p), sizeof(struct ip_hdr)));
 }
-} // namespace
 
-Router::Router(const std::vector<struct route_table_entry> &rtable,
-               const std::array<struct arp_table_entry, 6> &arp) {
-  for (const auto &entry : arp) {
-    std::array<uint8_t, 6> mac;
-    std::copy(std::begin(entry.mac), std::end(entry.mac), mac.begin());
-    arp_table_.emplace(entry.ip, mac);
-  }
+// Return a frame containing the ARP request
+std::array<std::byte, ETHER_HDR_SIZE + ARP_HDR_SIZE>
+generate_arp_request(uint32_t source_ip, tcb::span<const uint8_t> source_mac,
+                     uint32_t dest_ip) {
+  std::array<std::byte, ETHER_HDR_SIZE + ARP_HDR_SIZE> frame;
+  auto *eth_hdr = reinterpret_cast<struct ether_hdr *>(frame.data());
+  auto *arp_hdr =
+      reinterpret_cast<struct arp_hdr *>(frame.data() + ETHER_HDR_SIZE);
+  *arp_hdr = {.hw_type = util::ntoh(ARP_HW_TYPE_ETHERNET),
+              .proto_type = util::ntoh(ARP_PROTO_TYPE_IP), // IPv4
+              .hw_len = ARP_HW_LEN,
+              .proto_len = ARP_PROTO_LEN,
+              .opcode = util::ntoh(ARP_OPCODE_REQUEST),
+              .shwa = {},
+              .sprotoa = source_ip,
+              .thwa = {},
+              .tprotoa = dest_ip};
+  std::copy(source_mac.begin(), source_mac.end(), std::begin(arp_hdr->shwa));
+  std::fill(std::begin(arp_hdr->thwa), std::end(arp_hdr->thwa), 0x00);
 
-  auto rtable_entries = tcb::span(rtable);
-  rtable_.add_entries(rtable_entries);
+  std::copy(source_mac.begin(), source_mac.end(), eth_hdr->ethr_shost);
+  std::fill(std::begin(eth_hdr->ethr_dhost), std::end(eth_hdr->ethr_dhost),
+            0xff);
+  eth_hdr->ethr_type = util::ntoh(ETHERTYPE_ARP);
+  return frame;
 }
 
-std::optional<std::pair<uint32_t, Router::iface_t>>
+std::array<std::byte, ETHER_HDR_SIZE + ARP_HDR_SIZE>
+generate_arp_reply(uint32_t source_ip, tcb::span<const uint8_t> source_mac,
+                   uint32_t dest_ip, tcb::span<const uint8_t> dest_mac) {
+  std::array<std::byte, ETHER_HDR_SIZE + ARP_HDR_SIZE> frame;
+  auto *eth_hdr = reinterpret_cast<struct ether_hdr *>(frame.data());
+  auto *arp_hdr =
+      reinterpret_cast<struct arp_hdr *>(frame.data() + ETHER_HDR_SIZE);
+  *arp_hdr = {.hw_type = util::ntoh(ARP_HW_TYPE_ETHERNET),
+              .proto_type = util::ntoh(ARP_PROTO_TYPE_IP), // IPv4
+              .hw_len = ARP_HW_LEN,
+              .proto_len = ARP_PROTO_LEN,
+              .opcode = util::ntoh(ARP_OPCODE_REPLY),
+              .shwa = {},
+              .sprotoa = source_ip,
+              .thwa = {},
+              .tprotoa = dest_ip};
+  std::copy(source_mac.begin(), source_mac.end(), std::begin(arp_hdr->shwa));
+  std::copy(dest_mac.begin(), dest_mac.end(), std::begin(arp_hdr->thwa));
+
+  std::copy(dest_mac.begin(), dest_mac.end(), eth_hdr->ethr_dhost);
+  std::copy(source_mac.begin(), source_mac.end(), eth_hdr->ethr_shost);
+  eth_hdr->ethr_type = util::ntoh(ETHERTYPE_ARP);
+  return frame;
+}
+
+} // namespace
+
+std::optional<std::pair<uint32_t, iface_t>>
 Router::get_next_hop(uint32_t dest_ip) {
   auto entry = rtable_.lookup(dest_ip);
   if (!entry) {
@@ -103,6 +145,25 @@ void Router::handle_arp_packet(tcb::span<std::byte> frame, iface_t interface) {
   // Check if the packet is too small
   if (frame.size() < sizeof(arp_hdr)) {
     LOG_ERROR("Cannot read ARP header. Packet too small");
+    return;
+  }
+
+  // Extract the ARP header
+  const auto *arp_hdr = reinterpret_cast<const struct arp_hdr *>(
+      frame.subspan(ETHER_HDR_SIZE).data());
+  uint16_t opcode = util::hton(arp_hdr->opcode);
+
+  switch (opcode) {
+  case ARP_OPCODE_REQUEST:
+    LOG_DEBUG("ARP request");
+    handle_arp_request(frame, interface);
+    break;
+  case ARP_OPCODE_REPLY:
+    LOG_DEBUG("ARP reply");
+    handle_arp_reply(frame, interface);
+    break;
+  default:
+    LOG_ERROR("Unknown ARP opcode: {}", opcode);
     return;
   }
 }
@@ -183,10 +244,20 @@ void Router::handle_forward_ip_packet(tcb::span<std::byte> frame,
 
 void Router::send_frame(tcb::span<std::byte> frame, iface_t interface,
                         uint32_t dest_ip, uint16_t eth_type) {
-
   std::array<uint8_t, 6> source_mac = get_interface_mac(interface);
   // TODO: Use dynamic arp
-  std::array<uint8_t, 6> dest_mac = arp_table_[dest_ip];
+  // std::array<uint8_t, 6> dest_mac = arp_table_[dest_ip];
+  auto dest_mac_entry = arp_table_.lookup(dest_ip);
+  if (!dest_mac_entry) {
+    LOG_DEBUG("No matching ARP entry found for IP: {:x}", dest_ip);
+    send_arp_request(dest_ip, interface);
+    // Cache the packet for later
+    arp_table_.add_pending_packet(
+        dest_ip,
+        {interface, std::vector<std::byte>(frame.begin(), frame.end())});
+    return;
+  }
+  auto dest_mac = dest_mac_entry->mac;
 
   ether_hdr *eth_hdr = reinterpret_cast<ether_hdr *>(frame.data());
   std::copy(source_mac.begin(), source_mac.end(), eth_hdr->ethr_shost);
@@ -196,6 +267,84 @@ void Router::send_frame(tcb::span<std::byte> frame, iface_t interface,
   // Send the frame
   LOG_DEBUG("Sending frame to interface {}: {:xpn}", interface,
             spdlog::to_hex(dest_mac));
+  send_to_link(frame.size(), reinterpret_cast<char *>(frame.data()), interface);
+}
+
+void Router::send_arp_request(uint32_t dest_ip, iface_t interface) {
+  auto [source_ip, source_mac] = get_interface_info(interface);
+
+  LOG_DEBUG("Sending ARP request to {:x} on interface {} with MAC {:xpn}",
+            dest_ip, interface, spdlog::to_hex(source_mac));
+
+  auto frame = generate_arp_request(source_ip, source_mac, dest_ip);
+  send_to_link(frame.size(), reinterpret_cast<char *>(frame.data()), interface);
+}
+
+void Router::handle_arp_reply(tcb::span<std::byte> frame, iface_t interface) {
+  LOG_DEBUG("Handling ARP reply");
+
+  // Extract the ARP header
+  const auto *arp_hdr = reinterpret_cast<const struct arp_hdr *>(
+      frame.subspan(ETHER_HDR_SIZE).data());
+
+  // Store the MAC address in the ARP table
+  std::array<uint8_t, 6> sender_mac{};
+  std::copy(std::begin(arp_hdr->shwa), std::end(arp_hdr->shwa),
+            sender_mac.begin());
+  uint32_t sender_ip = arp_hdr->sprotoa;
+  // arp_table_.emplace(sender_ip, sender_mac);
+  arp_table_.add_entry({
+      .ip = sender_ip,
+      .mac = sender_mac,
+  });
+
+  LOG_DEBUG("Stored ARP entry: {:x} -> {:xpn}", sender_ip,
+            spdlog::to_hex(sender_mac));
+
+  // Handle any pending packets for this IP address
+  auto pending_pkts = arp_table_.retrieve_pending_packets(sender_ip);
+  if (!pending_pkts) {
+    LOG_DEBUG("No pending packets for IP: {:x}", sender_ip);
+    return;
+  }
+
+  for (const auto &pending_pkt : *pending_pkts) {
+    auto [iface, pkt] = pending_pkt;
+    LOG_DEBUG("Sending pending packet to interface {}: {:xpn}", iface,
+              spdlog::to_hex(sender_mac));
+    send_frame(pkt, iface, sender_ip, ETHERTYPE_IP);
+  }
+}
+
+void Router::handle_arp_request(tcb::span<std::byte> frame, iface_t interface) {
+  LOG_DEBUG("Handling ARP request");
+
+  // Extract the ARP header
+  const auto *arp_hdr = reinterpret_cast<const struct arp_hdr *>(
+      frame.subspan(ETHER_HDR_SIZE).data());
+
+  // Check if the request is for this router
+  if (arp_hdr->tprotoa != get_interface_ip(interface)) {
+    LOG_DEBUG("ARP request not for this router. Ignoring");
+    return;
+  }
+
+  // Send an ARP reply
+  std::array<uint8_t, 6> dest_mac{};
+  std::copy(std::begin(arp_hdr->shwa), std::end(arp_hdr->shwa),
+            dest_mac.begin());
+  uint32_t dest_ip = arp_hdr->sprotoa;
+  send_arp_reply(dest_ip, interface, dest_mac);
+}
+
+void Router::send_arp_reply(uint32_t dest_ip, iface_t interface,
+                            const std::array<uint8_t, 6> &dest_mac) {
+  auto [source_ip, source_mac] = get_interface_info(interface);
+
+  LOG_DEBUG("Sending ARP reply to {:x} on interface {} with MAC {:xpn}",
+            dest_ip, interface, spdlog::to_hex(source_mac));
+
+  auto frame = generate_arp_reply(source_ip, source_mac, dest_ip, dest_mac);
   send_to_link(frame.size(), reinterpret_cast<char *>(frame.data()), interface);
 }
 
