@@ -28,7 +28,7 @@ void recompute_checksum(struct ip_hdr *ip_hdr_p) {
 
 std::optional<std::pair<uint32_t, Router::iface_t>>
 Router::get_next_hop(uint32_t dest_ip) {
-  auto entry = rtable.lookup(dest_ip);
+  auto entry = rtable_.lookup(dest_ip);
   if (!entry) {
     return std::nullopt;
   }
@@ -40,10 +40,10 @@ Router::get_next_hop(uint32_t dest_ip) {
 }
 
 Router::interface_info Router::get_interface_info(iface_t interface) {
-  auto it = interface_ip_map.find(interface);
+  auto it = interface_ip_map_.find(interface);
 
   // If the interface info is already known, return it
-  if (it != interface_ip_map.end()) {
+  if (it != interface_ip_map_.end()) {
     return it->second;
   }
 
@@ -53,7 +53,7 @@ Router::interface_info Router::get_interface_info(iface_t interface) {
   ::get_interface_mac(interface, mac.data());
 
   interface_info info{ip, mac};
-  interface_ip_map.try_emplace(interface, info);
+  interface_ip_map_.try_emplace(interface, info);
   // LOG_DEBUG("Inserted interface-info pair: {} -> {}", interface, info);
   LOG_DEBUG("Inserted interface-info pair: {} -> {{ ip: {:x}, mac: {:xpn} }}",
             interface, info.ip, spdlog::to_hex(info.mac));
@@ -174,7 +174,7 @@ void Router::send_frame(tcb::span<std::byte> frame, iface_t interface,
 
   std::array<uint8_t, 6> source_mac = get_interface_mac(interface);
   // TODO: Use dynamic arp
-  std::array<uint8_t, 6> dest_mac = arp_table[dest_ip];
+  std::array<uint8_t, 6> dest_mac = arp_table_[dest_ip];
 
   ether_hdr *eth_hdr = reinterpret_cast<ether_hdr *>(frame.data());
   std::copy(source_mac.begin(), source_mac.end(), eth_hdr->ethr_shost);

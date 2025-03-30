@@ -19,11 +19,11 @@ public:
     for (const auto &entry : arp) {
       std::array<uint8_t, 6> mac;
       std::copy(std::begin(entry.mac), std::end(entry.mac), mac.begin());
-      arp_table.emplace(entry.ip, mac);
+      arp_table_.emplace(entry.ip, mac);
     }
 
     auto rtable_entries = tcb::span(rtable);
-    this->rtable.add_entries(rtable_entries);
+    rtable_.add_entries(rtable_entries);
   }
 
   void handle_frame(tcb::span<std::byte> frame, iface_t interface);
@@ -54,10 +54,9 @@ private:
   }
   std::optional<std::pair<uint32_t, iface_t>> get_next_hop(uint32_t dest_ip);
 
-  RoutingTable rtable{};
-  std::unordered_map<uint32_t, std::array<uint8_t, 6>> arp_table;
-
-  std::unordered_map<iface_t, interface_info> interface_ip_map;
+  RoutingTable rtable_{};
+  std::unordered_map<uint32_t, std::array<uint8_t, 6>> arp_table_{};
+  std::unordered_map<iface_t, interface_info> interface_ip_map_{};
 };
 
 } // namespace router

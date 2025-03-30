@@ -28,19 +28,19 @@ public:
     * @param value The value to insert.
 */
   void insert(Key path, size_t prefix_len, Value value) {
-    Node *cur = root.get();
+    Node *cur = root_.get();
 
     Key mask = 1 << (BITS - 1);
     for (size_t i = 0; i < prefix_len; ++i) {
       size_t index = path & mask ? 1 : 0;
       mask >>= 1;
-      if (!cur->children[index]) {
-        cur->children[index] = std::make_unique<Node>();
+      if (!cur->children_[index]) {
+        cur->children_[index] = std::make_unique<Node>();
       }
-      cur = cur->children[index].get();
+      cur = cur->children_[index].get();
     }
-    cur->value = std::move(value);
-    cur->is_end_of_key = true;
+    cur->value_ = std::move(value);
+    cur->is_end_of_key_ = true;
   }
 
   /**
@@ -54,24 +54,24 @@ public:
     std::nullopt if no match is found.
 */
   std::optional<Value> longest_prefix_match(Key path) const {
-    Node *cur = root.get();
+    Node *cur = root_.get();
     Node *result = nullptr;
 
     Key mask = 1 << (BITS - 1);
     for (size_t i = 0; i < BITS; ++i) {
       size_t index = path & mask ? 1 : 0;
       mask >>= 1;
-      if (!cur->children[index]) {
+      if (!cur->children_[index]) {
         break;
       }
-      cur = cur->children[index].get();
-      if (cur->is_end_of_key) {
+      cur = cur->children_[index].get();
+      if (cur->is_end_of_key_) {
         result = cur;
       }
     }
 
     if (result) {
-      return result->value;
+      return result->value_;
     }
     return std::nullopt;
   }
@@ -88,41 +88,41 @@ public:
     * @return true if the value was successfully erased, false otherwise.
 */
   bool erase(Key path, size_t prefix_len) {
-    path_buffer.clear();
-    path_buffer.reserve(BITS);
+    path_buffer_.clear();
+    path_buffer_.reserve(BITS);
 
     Key mask = 1 << (BITS - 1);
 
-    Node *cur = root.get();
+    Node *cur = root_.get();
     for (size_t i = 0; i < prefix_len; ++i) {
       size_t index = path & mask ? 1 : 0;
       mask >>= 1;
 
-      if (!cur->children[index]) {
+      if (!cur->children_[index]) {
         return false;
       }
-      path_buffer.push_back(cur);
-      cur = cur->children[index].get();
+      path_buffer_.push_back(cur);
+      cur = cur->children_[index].get();
     }
 
-    if (!cur->is_end_of_key) {
+    if (!cur->is_end_of_key_) {
       return false;
     }
-    cur->is_end_of_key = false;
-    cur->value.reset();
+    cur->is_end_of_key_ = false;
+    cur->value_.reset();
 
     mask = 1 << (BITS - 1);
     // Iterate in reverse to remove empty nodes
     for (size_t i = 0; i < prefix_len; ++i) {
       size_t index = (path & mask) ? 1 : 0;
       mask >>= 1;
-      Node *parent = path_buffer[i];
-      Node *child = parent->children[index].get();
-      if (child->is_end_of_key || child->children[0] || child->children[1]) {
+      Node *parent = path_buffer_[i];
+      Node *child = parent->children_[index].get();
+      if (child->is_end_of_key_ || child->children_[0] || child->children_[1]) {
         break;
       }
 
-      parent->children[index].reset();
+      parent->children_[index].reset();
     }
 
     return true;
@@ -130,13 +130,13 @@ public:
 
 private:
   struct Node {
-    std::array<std::unique_ptr<Node>, 2> children{nullptr, nullptr};
-    std::optional<Value> value;
-    bool is_end_of_key = false;
+    std::array<std::unique_ptr<Node>, 2> children_{nullptr, nullptr};
+    std::optional<Value> value_;
+    bool is_end_of_key_ = false;
   };
 
-  std::unique_ptr<Node> root{std::make_unique<Node>()};
-  std::vector<Node *> path_buffer;
+  std::unique_ptr<Node> root_{std::make_unique<Node>()};
+  std::vector<Node *> path_buffer_;
 };
 
 } // namespace trie
