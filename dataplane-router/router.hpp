@@ -1,7 +1,7 @@
 #pragma once
 
-#include "binary_trie.hpp"
 #include "lib_wrapper.hpp"
+#include "routing-table.hpp"
 #include "span.hpp"
 #include "util.hpp"
 #include <cstdint>
@@ -14,7 +14,7 @@ class Router {
 public:
   using iface_t = size_t;
 
-  Router(const std::vector<route_table_entry> &rtable,
+  Router(const std::vector<struct route_table_entry> &rtable,
          const std::array<struct arp_table_entry, 6> &arp) {
     for (const auto &entry : arp) {
       std::array<uint8_t, 6> mac;
@@ -22,12 +22,8 @@ public:
       arp_table.emplace(entry.ip, mac);
     }
 
-    for (const auto &entry : rtable) {
-      int prefix_len = util::countl_one(util::ntoh(entry.mask));
-      uint32_t path = util::ntoh(entry.prefix);
-
-      route_trie.insert(path, prefix_len, entry);
-    }
+    auto rtable_entries = tcb::span(rtable);
+    this->rtable.add_entries(rtable_entries);
   }
 
   void handle_frame(tcb::span<std::byte> frame, iface_t interface);
@@ -56,17 +52,9 @@ private:
   bool is_for_this_router(uint32_t dest_ip, iface_t interface) {
     return (dest_ip == get_interface_ip(interface));
   }
-  std::optional<std::pair<uint32_t, iface_t>> get_next_hop(uint32_t dest_ip) {
-    auto entry = route_trie.longest_prefix_match(util::ntoh(dest_ip));
-    if (entry) {
-      uint32_t next_hop = entry->next_hop;
-      iface_t interface = entry->interface;
-      return std::make_pair(next_hop, interface);
-    }
-    return std::nullopt;
-  }
+  std::optional<std::pair<uint32_t, iface_t>> get_next_hop(uint32_t dest_ip);
 
-  trie::BinaryTrie<uint32_t, route_table_entry> route_trie{};
+  RoutingTable rtable{};
   std::unordered_map<uint32_t, std::array<uint8_t, 6>> arp_table;
 
   std::unordered_map<iface_t, interface_info> interface_ip_map;

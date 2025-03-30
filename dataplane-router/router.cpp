@@ -26,6 +26,19 @@ void recompute_checksum(struct ip_hdr *ip_hdr_p) {
 }
 } // namespace
 
+std::optional<std::pair<uint32_t, Router::iface_t>>
+Router::get_next_hop(uint32_t dest_ip) {
+  auto entry = rtable.lookup(dest_ip);
+  if (!entry) {
+    return std::nullopt;
+  }
+
+  uint32_t next_hop_ip = entry->next_hop;
+  iface_t next_hop_iface = entry->interface;
+
+  return std::make_pair(next_hop_ip, next_hop_iface);
+}
+
 Router::interface_info Router::get_interface_info(iface_t interface) {
   auto it = interface_ip_map.find(interface);
 

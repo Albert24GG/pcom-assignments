@@ -2,7 +2,6 @@
 
 #include <array>
 #include <cstddef>
-#include <iostream>
 #include <memory>
 #include <optional>
 #include <type_traits>
@@ -54,7 +53,7 @@ public:
     * @return The value associated with the longest prefix match, or
     std::nullopt if no match is found.
 */
-  std::optional<Value> longest_prefix_match(Key path) {
+  std::optional<Value> longest_prefix_match(Key path) const {
     Node *cur = root.get();
     Node *result = nullptr;
 
