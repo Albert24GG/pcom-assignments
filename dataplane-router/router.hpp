@@ -37,6 +37,10 @@ private:
                       const std::array<uint8_t, 6> &dest_mac);
   void handle_arp_reply(tcb::span<std::byte> frame, iface_t interface);
   void handle_arp_request(tcb::span<std::byte> frame, iface_t interface);
+  void handle_icmp_packet(tcb::span<std::byte> frame, iface_t interface);
+  void send_icmp_error(tcb::span<std::byte> frame, iface_t interface,
+                       uint8_t type, uint8_t code);
+  void send_icmp_echo_reply(tcb::span<std::byte> frame, iface_t interface);
 
   struct interface_info {
     uint32_t ip;

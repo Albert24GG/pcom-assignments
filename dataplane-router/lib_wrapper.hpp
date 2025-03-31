@@ -20,6 +20,17 @@ constexpr uint8_t ARP_PROTO_LEN = 4;
 constexpr size_t ARP_HDR_SIZE = sizeof(struct arp_hdr);
 
 constexpr size_t IP_HDR_SIZE = sizeof(struct ip_hdr);
+constexpr uint8_t IP_PROTO_ICMP = 1;
+constexpr uint8_t IP_DEFAULT_TTL = 64;
+
+constexpr uint8_t ICMP_TYPE_UNREACH = 3;
+constexpr uint8_t ICMP_CODE_UNREACH_NET = 0;
+constexpr uint8_t ICMP_TYPE_TIME_EXCEEDED = 11;
+constexpr uint8_t ICMP_CODE_TTL_EXCEEDED = 0;
+constexpr uint8_t ICMP_TYPE_ECHO_REQUEST = 8;
+constexpr uint8_t ICMP_CODE_ECHO_REQUEST = 0;
+constexpr uint8_t ICMP_TYPE_ECHO_REPLY = 0;
+constexpr uint8_t ICMP_CODE_ECHO_REPLY = 0;
 constexpr size_t ICMP_HDR_SIZE = sizeof(struct icmp_hdr);
 
 /**

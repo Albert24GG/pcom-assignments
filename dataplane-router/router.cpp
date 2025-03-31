@@ -1,11 +1,15 @@
 #include "router.hpp"
 #include "common.hpp"
+#include "lib.h"
 #include "lib_wrapper.hpp"
 #include "logger.hpp"
 #include "util.hpp"
+#include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <optional>
 #include <spdlog/fmt/bin_to_hex.h>
+#include <sys/types.h>
 
 namespace router {
 
@@ -164,11 +168,13 @@ void Router::handle_ip_packet(tcb::span<std::byte> frame, iface_t interface) {
   // Extract the IP header
   auto *ip_hdr_p = reinterpret_cast<struct ip_hdr *>(
       frame.subspan(sizeof(ether_hdr)).data());
+  bool for_this_router = is_for_this_router(ip_hdr_p->dest_addr, interface);
 
   // If TTL reached 1 or 0, we need to drop it
-  if (ip_hdr_p->ttl <= 1) {
-    LOG_DEBUG("TTL reached 0 or 1. Dropping packet");
-    // TODO: Send ICMP TTL exceeded message
+  if (ip_hdr_p->ttl <= 1 && !for_this_router) {
+    LOG_DEBUG("TTL reached 0. Dropping packet");
+    send_icmp_error(frame, interface, ICMP_TYPE_TIME_EXCEEDED,
+                    ICMP_CODE_TTL_EXCEEDED);
     return;
   }
 
@@ -179,7 +185,7 @@ void Router::handle_ip_packet(tcb::span<std::byte> frame, iface_t interface) {
   }
 
   // Check if the packet is for this router
-  if (is_for_this_router(ip_hdr_p->dest_addr, interface)) {
+  if (for_this_router) {
     handle_local_ip_packet(frame, interface);
     return;
   }
@@ -201,6 +207,16 @@ void Router::handle_local_ip_packet(tcb::span<std::byte> frame,
   // Extract the IP header
   const auto *ip_hdr = reinterpret_cast<const struct ip_hdr *>(
       frame.subspan(sizeof(ether_hdr)).data());
+
+  switch (uint8_t proto = ip_hdr->proto) {
+  case IP_PROTO_ICMP:
+    LOG_DEBUG("ICMP packet");
+    handle_icmp_packet(frame, interface);
+    break;
+  default:
+    LOG_ERROR("Unknown IP protocol: {}", proto);
+    return;
+  }
 }
 
 void Router::handle_forward_ip_packet(tcb::span<std::byte> frame,
@@ -218,7 +234,7 @@ void Router::handle_forward_ip_packet(tcb::span<std::byte> frame,
   auto next_hop = get_next_hop(dest_ip);
   if (!next_hop) {
     LOG_ERROR("No matching route found. Dropping packet");
-    // TODO: Send ICMP destination unreachable message
+    send_icmp_error(frame, interface, ICMP_TYPE_UNREACH, ICMP_CODE_UNREACH_NET);
     return;
   }
   auto [next_hop_ip, next_hop_iface] = *next_hop;
@@ -230,8 +246,6 @@ void Router::handle_forward_ip_packet(tcb::span<std::byte> frame,
 void Router::send_frame(tcb::span<std::byte> frame, iface_t interface,
                         uint32_t dest_ip, uint16_t eth_type) {
   std::array<uint8_t, 6> source_mac = get_interface_mac(interface);
-  // TODO: Use dynamic arp
-  // std::array<uint8_t, 6> dest_mac = arp_table_[dest_ip];
   auto dest_mac_entry = arp_table_.lookup(dest_ip);
   if (!dest_mac_entry) {
     LOG_DEBUG("No matching ARP entry found for IP: {:x}", dest_ip);
@@ -333,6 +347,115 @@ void Router::send_arp_reply(uint32_t dest_ip, iface_t interface,
   auto frame = generate_arp_frame(ARP_OPCODE_REPLY, source_ip, source_mac,
                                   dest_ip, dest_mac);
   send_to_link(frame.size(), reinterpret_cast<char *>(frame.data()), interface);
+}
+
+void Router::send_icmp_error(tcb::span<std::byte> frame, iface_t interface,
+                             uint8_t type, uint8_t code) {
+  LOG_DEBUG("Sending ICMP error: type {}, code {}", type, code);
+
+  std::vector<std::byte> new_frame_buffer{};
+  tcb::span<std::byte> icmp_frame{};
+  size_t icmp_frame_size = ETHER_HDR_SIZE + 2 * IP_HDR_SIZE + ICMP_HDR_SIZE + 8;
+
+  // Check if the current frame is large enough to modify in place
+  if (frame.size() < icmp_frame_size) {
+    new_frame_buffer.resize(icmp_frame_size);
+    icmp_frame = tcb::span(new_frame_buffer.data(), icmp_frame_size);
+    // Copy the original IP header and the first 8 bytes of the payload
+    auto old_ip_hdr_payload =
+        frame.subspan(ETHER_HDR_SIZE,
+                      std::min(frame.size() - ETHER_HDR_SIZE, IP_HDR_SIZE + 8));
+    std::copy(old_ip_hdr_payload.begin(), old_ip_hdr_payload.end(),
+              icmp_frame.subspan(ETHER_HDR_SIZE).begin());
+  } else {
+    icmp_frame = frame.subspan(0, icmp_frame_size);
+  }
+
+  auto *ip_hdr = reinterpret_cast<struct ip_hdr *>(
+      icmp_frame.subspan(ETHER_HDR_SIZE).data());
+  auto *icmp_hdr = reinterpret_cast<struct icmp_hdr *>(
+      icmp_frame.subspan(ETHER_HDR_SIZE + IP_HDR_SIZE).data());
+
+  uint32_t dest_ip = ip_hdr->source_addr;
+  uint32_t source_ip = get_interface_ip(interface);
+
+  // Copy the old IP header and 64 bits of the old payload to the payload of the
+  // icmp packet
+  {
+    auto icmp_payload = icmp_frame.subspan(ETHER_HDR_SIZE, IP_HDR_SIZE + 8);
+    std::copy(icmp_payload.begin(), icmp_payload.end(),
+              icmp_frame.subspan(ETHER_HDR_SIZE + IP_HDR_SIZE + ICMP_HDR_SIZE)
+                  .data());
+  }
+
+  ip_hdr->dest_addr = dest_ip;
+  ip_hdr->source_addr = source_ip;
+  ip_hdr->proto = IP_PROTO_ICMP;
+  ip_hdr->ttl = IP_DEFAULT_TTL;
+  ip_hdr->tot_len =
+      util::hton(static_cast<uint16_t>(icmp_frame.size() - ETHER_HDR_SIZE));
+  recompute_checksum(ip_hdr);
+
+  icmp_hdr->mcode = code;
+  icmp_hdr->mtype = type;
+  icmp_hdr->check = 0;
+  std::memset(&icmp_hdr->un_t, 0, sizeof(icmp_hdr->un_t));
+  icmp_hdr->check = util::hton(checksum(reinterpret_cast<uint16_t *>(icmp_hdr),
+                                        ICMP_HDR_SIZE + 8 + IP_HDR_SIZE));
+
+  send_frame(icmp_frame, interface, dest_ip, ETHERTYPE_IP);
+}
+
+void Router::handle_icmp_packet(tcb::span<std::byte> frame, iface_t interface) {
+  LOG_DEBUG("Handling ICMP packet");
+
+  // Check if the packet is too small
+  if (frame.size() < ETHER_HDR_SIZE + IP_HDR_SIZE + ICMP_HDR_SIZE) {
+    LOG_ERROR("Cannot read ICMP header. Packet too small");
+    return;
+  }
+
+  // Extract the ICMP header
+  auto *icmp_hdr = reinterpret_cast<struct icmp_hdr *>(
+      frame.subspan(ETHER_HDR_SIZE + IP_HDR_SIZE).data());
+
+  switch (uint8_t type = icmp_hdr->mtype) {
+  case ICMP_TYPE_ECHO_REQUEST:
+    LOG_DEBUG("ICMP echo request");
+    send_icmp_echo_reply(frame, interface);
+    break;
+  default:
+    LOG_ERROR("Received unsupported ICMP type: {}", type);
+    return;
+  }
+}
+
+void Router::send_icmp_echo_reply(tcb::span<std::byte> frame,
+                                  iface_t interface) {
+  LOG_DEBUG("Sending ICMP echo reply");
+
+  // Extract the ICMP header
+  auto *icmp_hdr = reinterpret_cast<struct icmp_hdr *>(
+      frame.subspan(ETHER_HDR_SIZE + IP_HDR_SIZE).data());
+
+  // Swap the source and destination IP addresses
+  auto *ip_hdr =
+      reinterpret_cast<struct ip_hdr *>(frame.subspan(ETHER_HDR_SIZE).data());
+  std::swap(ip_hdr->source_addr, ip_hdr->dest_addr);
+  ip_hdr->ttl = IP_DEFAULT_TTL;
+  recompute_checksum(ip_hdr);
+
+  icmp_hdr->mtype = ICMP_TYPE_ECHO_REPLY;
+  icmp_hdr->mcode = ICMP_CODE_ECHO_REPLY;
+
+  // Recalculate the checksum
+  recompute_checksum(ip_hdr);
+  icmp_hdr->check = 0;
+  icmp_hdr->check =
+      util::hton(checksum(reinterpret_cast<uint16_t *>(icmp_hdr),
+                          frame.size() - ETHER_HDR_SIZE - IP_HDR_SIZE));
+
+  send_frame(frame, interface, ip_hdr->dest_addr, ETHERTYPE_IP);
 }
 
 } // namespace router
