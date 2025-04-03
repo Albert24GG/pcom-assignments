@@ -15,19 +15,21 @@ namespace router {
 
 namespace {
 
-bool checksum_valid(struct ip_hdr *ip_hdr_p) {
+template <typename T>
+bool is_checksum_valid(T *header, size_t size = sizeof(T)) {
   // We can avoid setting the checksum field to 0. Due to the way the checksum
   // is calculated, if the current checksum has been computed with the field
   // set to 0, this means recalculating it will yield 0 in case of no errors.
   // This is because the checksum is a 1's complement sum of all 16-bit words
-  return checksum(reinterpret_cast<uint16_t *>(ip_hdr_p),
-                  sizeof(struct ip_hdr)) == 0;
+  return checksum(reinterpret_cast<uint16_t *>(header), size) == 0;
 }
 
-void recompute_checksum(struct ip_hdr *ip_hdr_p) {
-  ip_hdr_p->checksum = 0;
-  ip_hdr_p->checksum =
-      util::hton(checksum(reinterpret_cast<uint16_t *>(ip_hdr_p), IP_HDR_SIZE));
+template <typename T>
+void recompute_checksum(T *header, uint16_t T::*checksum_field,
+                        size_t size = sizeof(T)) {
+  header->*checksum_field = 0;
+  header->*checksum_field =
+      util::ntoh(checksum(reinterpret_cast<uint16_t *>(header), size));
 }
 
 // Return a frame containing the ARP request
@@ -179,7 +181,7 @@ void Router::handle_ip_packet(tcb::span<std::byte> frame, iface_t interface) {
   }
 
   // Recalculate the checksum
-  if (!checksum_valid(ip_hdr_p)) {
+  if (!is_checksum_valid(ip_hdr_p)) {
     LOG_ERROR("Checksum error. Dropping packet");
     return;
   }
@@ -194,7 +196,7 @@ void Router::handle_ip_packet(tcb::span<std::byte> frame, iface_t interface) {
   --ip_hdr_p->ttl;
 
   // Recalculate the checksum
-  recompute_checksum(ip_hdr_p);
+  recompute_checksum(ip_hdr_p, &ip_hdr::checksum);
 
   handle_forward_ip_packet(frame, interface);
 }
@@ -394,14 +396,13 @@ void Router::send_icmp_error(tcb::span<std::byte> frame, iface_t interface,
   ip_hdr->ttl = IP_DEFAULT_TTL;
   ip_hdr->tot_len =
       util::hton(static_cast<uint16_t>(icmp_frame.size() - ETHER_HDR_SIZE));
-  recompute_checksum(ip_hdr);
+  recompute_checksum(ip_hdr, &ip_hdr::checksum);
 
   icmp_hdr->mcode = code;
   icmp_hdr->mtype = type;
-  icmp_hdr->check = 0;
   std::memset(&icmp_hdr->un_t, 0, sizeof(icmp_hdr->un_t));
-  icmp_hdr->check = util::hton(checksum(reinterpret_cast<uint16_t *>(icmp_hdr),
-                                        ICMP_HDR_SIZE + 8 + IP_HDR_SIZE));
+  recompute_checksum(icmp_hdr, &icmp_hdr::check,
+                     icmp_frame.size() - ETHER_HDR_SIZE - IP_HDR_SIZE);
 
   send_frame(icmp_frame, interface, dest_ip, ETHERTYPE_IP);
 }
@@ -443,17 +444,15 @@ void Router::send_icmp_echo_reply(tcb::span<std::byte> frame,
       reinterpret_cast<struct ip_hdr *>(frame.subspan(ETHER_HDR_SIZE).data());
   std::swap(ip_hdr->source_addr, ip_hdr->dest_addr);
   ip_hdr->ttl = IP_DEFAULT_TTL;
-  recompute_checksum(ip_hdr);
+  recompute_checksum(ip_hdr, &ip_hdr::checksum);
 
   icmp_hdr->mtype = ICMP_TYPE_ECHO_REPLY;
   icmp_hdr->mcode = ICMP_CODE_ECHO_REPLY;
 
   // Recalculate the checksum
-  recompute_checksum(ip_hdr);
-  icmp_hdr->check = 0;
-  icmp_hdr->check =
-      util::hton(checksum(reinterpret_cast<uint16_t *>(icmp_hdr),
-                          frame.size() - ETHER_HDR_SIZE - IP_HDR_SIZE));
+  recompute_checksum(ip_hdr, &ip_hdr::checksum);
+  recompute_checksum(icmp_hdr, &icmp_hdr::check,
+                     frame.size() - ETHER_HDR_SIZE - IP_HDR_SIZE);
 
   send_frame(frame, interface, ip_hdr->dest_addr, ETHERTYPE_IP);
 }
