@@ -34,10 +34,10 @@ void recompute_checksum(T *header, uint16_t T::*checksum_field,
 
 // Return a frame containing the ARP request
 // If dest_mac is not provided, this means it is a broadcast
-std::array<std::byte, ETHER_HDR_SIZE + ARP_HDR_SIZE> generate_arp_frame(
-    uint16_t arp_op, uint32_t source_ip, tcb::span<const uint8_t, 6> source_mac,
-    uint32_t dest_ip,
-    std::optional<tcb::span<const uint8_t, 6>> dest_mac = std::nullopt) {
+std::array<std::byte, ETHER_HDR_SIZE + ARP_HDR_SIZE>
+_generate_arp_frame_common(uint16_t arp_op, uint32_t source_ip,
+                           tcb::span<const uint8_t, 6> source_mac,
+                           uint32_t dest_ip) {
 
   std::array<std::byte, ETHER_HDR_SIZE + ARP_HDR_SIZE> frame;
   auto *eth_hdr = reinterpret_cast<struct ether_hdr *>(frame.data());
@@ -55,18 +55,42 @@ std::array<std::byte, ETHER_HDR_SIZE + ARP_HDR_SIZE> generate_arp_frame(
   std::copy(source_mac.begin(), source_mac.end(), std::begin(arp_hdr->shwa));
   std::copy(source_mac.begin(), source_mac.end(),
             std::begin(eth_hdr->ethr_shost));
-
-  if (dest_mac) {
-    std::copy(dest_mac->begin(), dest_mac->end(),
-              std::begin(eth_hdr->ethr_dhost));
-    std::copy(dest_mac->begin(), dest_mac->end(), std::begin(arp_hdr->thwa));
-  } else {
-    std::fill(std::begin(eth_hdr->ethr_dhost), std::end(eth_hdr->ethr_dhost),
-              0xff);
-    std::fill(std::begin(arp_hdr->thwa), std::end(arp_hdr->thwa), 0x00);
-  }
-
   eth_hdr->ethr_type = util::hton(ETHERTYPE_ARP);
+  return frame;
+}
+
+std::array<std::byte, ETHER_HDR_SIZE + ARP_HDR_SIZE>
+generate_arp_frame(uint16_t arp_op, uint32_t source_ip,
+                   tcb::span<const uint8_t, 6> source_mac, uint32_t dest_ip,
+                   tcb::span<const uint8_t, 6> dest_mac) {
+
+  std::array<std::byte, ETHER_HDR_SIZE + ARP_HDR_SIZE> frame =
+      _generate_arp_frame_common(arp_op, source_ip, source_mac, dest_ip);
+
+  auto *eth_hdr = reinterpret_cast<struct ether_hdr *>(frame.data());
+  auto *arp_hdr =
+      reinterpret_cast<struct arp_hdr *>(frame.data() + ETHER_HDR_SIZE);
+
+  std::copy(dest_mac.begin(), dest_mac.end(), std::begin(eth_hdr->ethr_dhost));
+  std::copy(dest_mac.begin(), dest_mac.end(), std::begin(arp_hdr->thwa));
+
+  return frame;
+}
+
+std::array<std::byte, ETHER_HDR_SIZE + ARP_HDR_SIZE>
+generate_arp_frame(uint16_t arp_op, uint32_t source_ip,
+                   tcb::span<const uint8_t, 6> source_mac, uint32_t dest_ip) {
+  std::array<std::byte, ETHER_HDR_SIZE + ARP_HDR_SIZE> frame =
+      _generate_arp_frame_common(arp_op, source_ip, source_mac, dest_ip);
+
+  auto *eth_hdr = reinterpret_cast<struct ether_hdr *>(frame.data());
+  auto *arp_hdr =
+      reinterpret_cast<struct arp_hdr *>(frame.data() + ETHER_HDR_SIZE);
+
+  std::fill(std::begin(eth_hdr->ethr_dhost), std::end(eth_hdr->ethr_dhost),
+            0xff);
+  std::fill(std::begin(arp_hdr->thwa), std::end(arp_hdr->thwa), 0x00);
+
   return frame;
 }
 
