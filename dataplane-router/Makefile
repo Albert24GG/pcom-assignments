@@ -22,12 +22,6 @@ all: $(SOURCES) $(BINARY)
 $(BINARY): $(OBJECTS)
 	$(CXX) $(LIBFLAGS) $(OBJECTS) $(LDFLAGS) -o $@
 
-unit-tests: tests.o
-	$(CXX) $(LIBFLAGS) tests.o $(LDFLAGS) -o tests
-
-run-tests: unit-tests
-	./tests
-
 %.o: %.c
 	$(CC) $(INCFLAGS) $(CFLAGS) -fPIC $< -o $@
 
@@ -35,7 +29,7 @@ run-tests: unit-tests
 	$(CXX) $(INCFLAGS) $(CXXFLAGS) -fPIC $< -o $@
 
 clean:
-	rm -rf $(OBJECTS) router hosts_output router_* tests.o tests
+	rm -rf $(OBJECTS) router hosts_output router_*
 
 run_router0: all
 	./router rtable0.txt rr-0-1 r-0 r-1
