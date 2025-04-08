@@ -4,10 +4,20 @@ LIBRARY=nope
 INCPATHS=include
 LIBPATHS=.
 LDFLAGS=
-CFLAGS=-c -Wall -Werror -Wno-error=unused-variable
-CXXFLAGS=-c -Wall -Werror -Wno-error=unused-variable -std=c++17 -DDEBUG
+CFLAGS=-c -Wall -Werror -Wno-error=unused-variable -Wno-error=format-overflow
+CXXFLAGS=-c -Wall -Werror -Wno-error=unused-variable -std=c++17
 CC=gcc
 CXX=g++
+
+DEBUG ?= 0
+ifeq ($(DEBUG), 1)
+	CFLAGS += -g -fsanitize=address -DDEBUG
+	CXXFLAGS += -g -fsanitize=address -DDEBUG
+else
+	CFLAGS += -O3
+	CXXFLAGS += -O3
+endif
+
 
 # Automatic generation of some important lists
 OBJECTS=$(patsubst %.c, %.o, $(patsubst %.cpp, %.o, $(SOURCES)))
