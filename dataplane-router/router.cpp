@@ -8,8 +8,11 @@
 #include <cstdint>
 #include <cstring>
 #include <optional>
-#include <spdlog/fmt/bin_to_hex.h>
 #include <sys/types.h>
+
+#ifdef ENABLE_LOGGING
+#include <spdlog/fmt/bin_to_hex.h>
+#endif
 
 namespace router {
 

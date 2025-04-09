@@ -1,5 +1,5 @@
 PROJECT=router
-SOURCES=main.cpp lib/lib.c logger.cpp router.cpp routing-table.cpp arp-table.cpp
+SOURCES=main.cpp lib/lib.c router.cpp routing-table.cpp arp-table.cpp
 LIBRARY=nope
 INCPATHS=include
 LIBPATHS=.
@@ -16,6 +16,13 @@ ifeq ($(DEBUG), 1)
 else
 	CFLAGS += -O3
 	CXXFLAGS += -O3
+endif
+
+ENABLE_LOGGING ?= 0
+ifeq ($(ENABLE_LOGGING), 1)
+	CFLAGS += -DENABLE_LOGGING
+	CXXFLAGS += -DENABLE_LOGGING
+	SOURCES += logger.cpp
 endif
 
 

@@ -1,5 +1,16 @@
 #pragma once
 
+#ifndef ENABLE_LOGGING
+
+#define LOG_TRACE(...) (void)0
+#define LOG_DEBUG(...) (void)0
+#define LOG_INFO(...) (void)0
+#define LOG_WARN(...) (void)0
+#define LOG_ERROR(...) (void)0
+#define LOG_CRITICAL(...) (void)0
+
+#else
+
 #ifdef DEBUG
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 #endif
@@ -51,3 +62,5 @@ spdlog::logger *get_instance();
 void set_level(Level level);
 
 }; // namespace logger
+
+#endif // ENABLE_LOGGING

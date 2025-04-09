@@ -14,10 +14,12 @@ int main(int argc, char *argv[]) {
   // Do not modify this line
   init(argv + 2, argc - 2);
 
+#ifdef ENABLE_LOGGING
   // Initialize the logger
   logger::set_level(logger::Level::debug);
   logger::init();
   LOG_INFO("Router started");
+#endif
 
   // Read the routing table
   std::vector<struct route_table_entry> rtable(MAX_ROUTING_TABLE_SIZE);
@@ -51,12 +53,5 @@ int main(int argc, char *argv[]) {
     LOG_DEBUG("Received frame of size {} on interface {}", len, interface);
 
     router.handle_frame(frame, interface);
-
-    // TODO: Implement the router forwarding logic
-
-    /* Note that packets received are in network order,
-                any header field which has more than 1 byte will need to be
-       conerted to host order. For example, ntohs(eth_hdr->ether_type). The
-       oposite is needed when sending a packet on the link, */
   }
 }
