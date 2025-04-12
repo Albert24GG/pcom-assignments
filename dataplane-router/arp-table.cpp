@@ -14,9 +14,9 @@ std::optional<std::vector<PendingPacket>>
 ArpTable::retrieve_pending_packets(uint32_t ip) {
   auto it = pending_packets_.find(ip);
   if (it != pending_packets_.end()) {
-    auto packets = it->second;
+    auto &packets = it->second;
     pending_packets_.erase(it); // Remove the entry after retrieving
-    return packets;
+    return std::move(packets);
   }
   return std::nullopt;
 }
