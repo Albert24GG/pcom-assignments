@@ -12,11 +12,9 @@ std::optional<ArpTableEntry> ArpTable::lookup(uint32_t ip) const {
 
 std::optional<std::vector<PendingPacket>>
 ArpTable::retrieve_pending_packets(uint32_t ip) {
-  auto it = pending_packets_.find(ip);
-  if (it != pending_packets_.end()) {
-    auto &packets = it->second;
-    pending_packets_.erase(it); // Remove the entry after retrieving
-    return std::move(packets);
+  auto node = pending_packets_.extract(ip);
+  if (node) {
+    return std::move(node.mapped());
   }
   return std::nullopt;
 }
