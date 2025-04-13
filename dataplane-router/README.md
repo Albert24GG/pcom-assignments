@@ -8,9 +8,12 @@ Aceasta implementare abordeaza toate subcerintele din tema.
 ### router.hpp / router.cpp
 Contine implementarea in sine a routerului, interfata constand intr-o metoda care updateaza tabelul de rutare (`add_rtable_entries`) si o metoda care primeste un cadru (`handle_frame`).
 
-Metoda `handle_frame` verifica tipul informatiei incapulate de cadru (IP/ARP) si il trimite mai departe catre metodele ce se ocupa cu gestionarea fiecarui tip de pachet (`handle_arp_packet`, `handle_ip_packet`).
+Metoda `handle_frame` este punctul de intrare pentru fiecare cadru Ethernet, aceasta verificand tipul informatiei incapulate de cadru (IP/ARP) si il trimitandu-l mai departe catre metodele ce se ocupa cu gestionarea fiecarui tip de pachet (`handle_arp_packet`, `handle_ip_packet`). La randul lor, aceste metode analizeaza
+headerul pachetului si decid ce actiuni sunt necesare (ex: forwarding, reply, aruncarea pachetului si trimiterea unui mesaj de eroare, etc).
 
-Mai departe functiile folosite comportamentul indicat in cerinta temei, procesul de gestionare al cadrelor fiind unul cat se poate de liniar, fara revenire in functia apelanta. Din acest motiv, urmarirea fluxului programului este relativ accesibila, iar faptul ca nu se revine in functia apelanta da posibilitatea optimizarilor precum "tail-recursion".
+De asemenea, fiecare metoda primeste ca parametru un **view** al intregului frame Ethernet, pentru a nu fi necesare copieri sau reveniri in functiile apelante.
+Astfel, am obtinut o eficienta mai mare si un cod mai curat, chiar daca, in teorie, aceasta abordare introduce riscul modificarii datelor originale de catre
+o functie care nu ar trebui sa faca acest lucru.
 
 De mentionat este si faptul ca nu am realizat verificari in plus fata de cele cerute in tema, precum verificari ce tin de securitate (ex: verificari de tipul "IP spoofing", sau verificari ale lungimii pachetelor). Astfel, programul functioneaza corect atat timp cat pachetele primite nu au erori sau intentii malitioase.
 
