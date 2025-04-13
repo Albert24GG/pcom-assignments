@@ -32,7 +32,7 @@ void recompute_checksum(T *header, uint16_t T::*checksum_field,
                         size_t size = sizeof(T)) {
   header->*checksum_field = 0;
   header->*checksum_field =
-      util::ntoh(checksum(reinterpret_cast<uint16_t *>(header), size));
+      util::hton(checksum(reinterpret_cast<uint16_t *>(header), size));
 }
 
 // Return a frame containing the ARP request

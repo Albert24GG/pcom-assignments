@@ -19,7 +19,7 @@ public:
 
   [[nodiscard]] std::optional<RoutingTableEntry>
   lookup(uint32_t dest_ip) const {
-    return route_trie_.longest_prefix_match(util::hton(dest_ip));
+    return route_trie_.longest_prefix_match(util::ntoh(dest_ip));
   }
 
 private:
