@@ -5,7 +5,6 @@
 #include <cstring>
 #include <iostream>
 #include <netinet/in.h>
-#include <optional>
 #include <poll.h>
 #include <stdexcept>
 #include <sys/socket.h>
@@ -77,56 +76,6 @@ void unregister_pollfd(std::vector<pollfd> &fds, size_t index) {
   fds[index] = fds.back();
   fds.pop_back();
 }
-
-UdpPayloadVariant extract_payload(const std::byte *payload,
-                                  UdpPayloadType payload_type,
-                                  size_t payload_size) {
-  if (payload_size < UDP_MSG_PAYLOAD_MIN_SIZE[payload_type]) {
-    throw std::invalid_argument(
-        "Malformed UDP payload: payload size too small");
-  }
-  // If payload size if greater than the required size, the rest of the payload
-  // is ignored
-
-  switch (payload_type) {
-  case UdpPayloadType::INT: {
-    UdpPayload<UdpPayloadType::INT> payload_int;
-    memcpy(&payload_int.sign, payload, sizeof(payload_int.sign));
-    payload += sizeof(payload_int.sign);
-    memcpy(&payload_int.value, payload, sizeof(payload_int.value));
-    payload_int.value = ntoh(payload_int.value);
-    return payload_int;
-  }
-  case UdpPayloadType::SHORT_REAL: {
-    UdpPayload<UdpPayloadType::SHORT_REAL> payload_short_real;
-    memcpy(&payload_short_real.value, payload,
-           sizeof(payload_short_real.value));
-    payload_short_real.value = ntoh(payload_short_real.value);
-    return payload_short_real;
-  }
-  case UdpPayloadType::FLOAT: {
-    UdpPayload<UdpPayloadType::FLOAT> payload_float;
-    memcpy(&payload_float.sign, payload, sizeof(payload_float.sign));
-    payload += sizeof(payload_float.sign);
-    memcpy(&payload_float.value, payload, sizeof(payload_float.value));
-    payload_float.value = ntoh(payload_float.value);
-    payload += sizeof(payload_float.value);
-    memcpy(&payload_float.exponent, payload, sizeof(payload_float.exponent));
-    return payload_float;
-  }
-  case UdpPayloadType::STRING: {
-    UdpPayload<UdpPayloadType::STRING> payload_string;
-    size_t str_len = strnlen(reinterpret_cast<const char *>(payload),
-                             UDP_MSG_PAYLOAD_MAX_SIZE);
-    payload_string.value =
-        std::string(reinterpret_cast<const char *>(payload), str_len);
-    return payload_string;
-  }
-  default:
-    throw std::invalid_argument("Unknown payload type");
-  }
-}
-
 } // namespace
 
 void Server::handle_stdin(bool &stop) {
@@ -140,7 +89,7 @@ void Server::handle_stdin(bool &stop) {
   }
 }
 
-auto Server::handle_udp() -> std::optional<UdpMessage> {
+bool Server::handle_udp() {
   sockaddr_in addr{};
   socklen_t addr_len = sizeof(addr);
   ssize_t bytes_received =
@@ -150,31 +99,17 @@ auto Server::handle_udp() -> std::optional<UdpMessage> {
   if (bytes_received < 0) {
     std::cerr << "Error receiving UDP packet: " << std::strerror(errno)
               << std::endl;
-    return std::nullopt;
+    return false;
   }
 
-  UdpMessage msg;
-  size_t offset = 0;
-  {
-    size_t topic_len = strnlen(reinterpret_cast<char *>(udp_buffer_.data()),
-                               UDP_MSG_TOPIC_MAX_SIZE);
-    msg.topic =
-        std::string(reinterpret_cast<char *>(udp_buffer_.data()), topic_len);
-
-    offset += UDP_MSG_TOPIC_MAX_SIZE;
-  }
-  UdpPayloadType payload_type =
-      static_cast<UdpPayloadType>(udp_buffer_[offset++]); // payload type
-
-  std::byte *payload = udp_buffer_.data() + offset;
+  std::cout << "Recevied " << bytes_received << std::endl;
 
   try {
-    msg.payload =
-        extract_payload(payload, payload_type, bytes_received - offset);
-    return msg;
+    UdpMessage::deserialize(udp_msg_, udp_buffer_.data(), bytes_received);
+    return true;
   } catch (const std::invalid_argument &e) {
     std::cerr << "Error parsing UDP payload: " << e.what() << std::endl;
-    return std::nullopt;
+    return false;
   }
 }
 

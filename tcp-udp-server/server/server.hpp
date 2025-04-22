@@ -2,7 +2,6 @@
 
 #include "udp_proto.hpp"
 #include <cstdint>
-#include <optional>
 #include <vector>
 
 class Server {
@@ -33,10 +32,11 @@ public:
 
 private:
   void handle_stdin(bool &stop);
-  auto handle_udp() -> std::optional<UdpMessage>;
+  bool handle_udp();
 
-  int tcp_socket_{};
-  int udp_socket_{};
+  int listen_fd_{};
+  int udp_fd_{};
 
-  std::vector<std::byte> udp_buffer_{UDP_MSG_MAX_SIZE};
+  std::vector<std::byte> udp_buffer_{UdpMessage::MAX_SERIALIZED_SIZE};
+  UdpMessage udp_msg_{};
 };
