@@ -13,17 +13,17 @@
 
 Server::Server(uint16_t port) {
   // Create TCP socket
-  tcp_socket_ = socket(AF_INET, SOCK_STREAM, 0);
-  if (tcp_socket_ < 0) {
-    tcp_socket_ = -1;
+  listen_fd_ = socket(AF_INET, SOCK_STREAM, 0);
+  if (listen_fd_ < 0) {
+    listen_fd_ = -1;
     throw std::runtime_error("Failed to create TCP socket");
   }
 
   // Create UDP socket
-  udp_socket_ = socket(AF_INET, SOCK_DGRAM, 0);
-  if (udp_socket_ < 0) {
-    close(tcp_socket_);
-    udp_socket_ = -1;
+  udp_fd_ = socket(AF_INET, SOCK_DGRAM, 0);
+  if (udp_fd_ < 0) {
+    close(listen_fd_);
+    udp_fd_ = -1;
     throw std::runtime_error("Failed to create UDP socket");
   }
 
@@ -34,29 +34,27 @@ Server::Server(uint16_t port) {
   addr.sin_port = hton(port);
 
   // Bind the sockets
-  if (bind(tcp_socket_, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) <
-      0) {
-    close(tcp_socket_);
-    close(udp_socket_);
-    tcp_socket_ = udp_socket_ = -1;
+  if (bind(listen_fd_, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
+    close(listen_fd_);
+    close(udp_fd_);
+    listen_fd_ = udp_fd_ = -1;
     throw std::runtime_error("Failed to bind TCP socket");
   }
 
-  if (bind(udp_socket_, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) <
-      0) {
-    close(tcp_socket_);
-    close(udp_socket_);
-    tcp_socket_ = udp_socket_ = -1;
+  if (bind(udp_fd_, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
+    close(listen_fd_);
+    close(udp_fd_);
+    listen_fd_ = udp_fd_ = -1;
     throw std::runtime_error("Failed to bind UDP socket");
   }
 }
 
 Server::~Server() {
-  if (tcp_socket_ >= 0) {
-    close(tcp_socket_);
+  if (listen_fd_ >= 0) {
+    close(listen_fd_);
   }
-  if (udp_socket_ >= 0) {
-    close(udp_socket_);
+  if (udp_fd_ >= 0) {
+    close(udp_fd_);
   }
 }
 
@@ -146,7 +144,7 @@ auto Server::handle_udp() -> std::optional<UdpMessage> {
   sockaddr_in addr{};
   socklen_t addr_len = sizeof(addr);
   ssize_t bytes_received =
-      recvfrom(udp_socket_, udp_buffer_.data(), udp_buffer_.size(), 0,
+      recvfrom(udp_fd_, udp_buffer_.data(), udp_buffer_.size(), 0,
                reinterpret_cast<sockaddr *>(&addr), &addr_len);
 
   if (bytes_received < 0) {
@@ -184,8 +182,8 @@ void Server::run() {
   std::vector<pollfd> fds(3);
 
   // Register the initial pollfds
-  register_pollfd(fds, tcp_socket_, POLLIN);
-  register_pollfd(fds, udp_socket_, POLLIN);
+  register_pollfd(fds, listen_fd_, POLLIN);
+  register_pollfd(fds, udp_fd_, POLLIN);
   register_pollfd(fds, STDIN_FILENO, POLLIN);
 
   bool stopped = false;
@@ -205,7 +203,7 @@ void Server::run() {
       if (fds[i].revents & POLLIN) {
         if (fds[i].fd == STDIN_FILENO) {
           handle_stdin(stopped);
-        } else if (fds[i].fd == udp_socket_) {
+        } else if (fds[i].fd == udp_fd_) {
           auto msg = handle_udp();
         }
       }
