@@ -423,7 +423,6 @@ using TcpMessageVariant = std::variant<TcpRequest, TcpResponse>;
 
 struct TcpMessage {
   TcpMessageVariant payload;
-  uint32_t payload_size;
 
   /**
    * @brief Serializes the message into a byte buffer.
@@ -438,29 +437,17 @@ struct TcpMessage {
    */
   static void serialize(const TcpMessage &message, std::byte *buffer);
 
-  /**
-   * @brief Deserializes the message from a byte buffer.
-   *
-   * @param message The message to deserialize into.
-   * @param buffer The byte buffer containing the serialized data.
-   * @param buffer_size The size of the byte buffer.
-   *
-   * @throws std::invalid_argument if the deserialization fails.
-   */
-  static void deserialize(TcpMessage &message, const std::byte *buffer,
-                          size_t buffer_size);
-
   constexpr auto payload_type() const -> TcpMessageType {
     return static_cast<TcpMessageType>(payload.index());
   }
 
   constexpr size_t serialized_size() const {
-    return sizeof(TcpMessageType) + sizeof(payload_size) +
+    return sizeof(TcpMessageType) + sizeof(uint16_t) +
            std::visit([](auto &&arg) { return arg.serialized_size(); },
                       payload);
   }
 
   static constexpr size_t MAX_SERIALIZED_SIZE =
-      sizeof(TcpMessageType) + sizeof(payload_size) +
+      sizeof(TcpMessageType) + sizeof(uint16_t) +
       max_serialized_size<TcpMessageVariant>();
 };

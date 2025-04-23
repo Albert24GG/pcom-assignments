@@ -395,7 +395,9 @@ void TcpMessage::serialize(const TcpMessage &message, std::byte *buffer) {
   memcpy(buffer, &payload_type, sizeof(payload_type));
   buffer += sizeof(payload_type);
 
-  uint32_t payload_size_network = hton(message.payload_size);
+  uint16_t payload_size = std::visit(
+      [](auto &&arg) { return arg.serialized_size(); }, message.payload);
+  uint16_t payload_size_network = hton(payload_size);
   memcpy(buffer, &payload_size_network, sizeof(payload_size_network));
   buffer += sizeof(payload_size_network);
 
