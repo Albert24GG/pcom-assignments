@@ -335,9 +335,8 @@ void TcpResponse::serialize(const TcpResponse &response, std::byte *buffer) {
   memcpy(buffer, &response.udp_client_port, sizeof(udp_client_port));
   buffer += sizeof(udp_client_port);
 
-  uint8_t cast_topic_size = static_cast<uint8_t>(response.topic_size);
-  memcpy(buffer, &cast_topic_size, sizeof(cast_topic_size));
-  buffer += sizeof(cast_topic_size);
+  memcpy(buffer, &response.topic_size, sizeof(topic_size));
+  buffer += sizeof(topic_size);
 
   memcpy(buffer, response.topic.data(), response.topic_size);
   buffer += response.topic_size;
@@ -363,9 +362,7 @@ void TcpResponse::deserialize(TcpResponse &response, const std::byte *buffer,
   memcpy(&response.udp_client_port, buffer, sizeof(udp_client_port));
   buffer += sizeof(udp_client_port);
 
-  uint8_t topic_size;
-  memcpy(&topic_size, buffer, sizeof(topic_size));
-  response.topic_size = topic_size;
+  memcpy(&response.topic_size, buffer, sizeof(topic_size));
   buffer += sizeof(topic_size);
 
   buffer_size -=
@@ -376,8 +373,8 @@ void TcpResponse::deserialize(TcpResponse &response, const std::byte *buffer,
                                 "data: buffer size is too small");
   }
 
-  memcpy(response.topic.data(), buffer, topic_size);
-  response.topic[topic_size] = '\0';
+  memcpy(response.topic.data(), buffer, response.topic_size);
+  response.topic[response.topic_size] = '\0';
   buffer += response.topic_size;
 
   TcpResponsePayloadType payload_type = [buffer] {
@@ -387,7 +384,7 @@ void TcpResponse::deserialize(TcpResponse &response, const std::byte *buffer,
   }();
   buffer += sizeof(payload_type);
 
-  buffer_size -= topic_size + sizeof(payload_type);
+  buffer_size -= response.topic_size + sizeof(payload_type);
 
   switch (payload_type) {
   case TcpResponsePayloadType::INT:
