@@ -360,7 +360,7 @@ using TcpResponsePayloadVariant =
 struct TcpResponse {
   // Ip must be in network byte order
   uint32_t udp_client_ip;
-  // Port must be in host byte order
+  // Port must be in network byte order
   uint16_t udp_client_port;
 
   std::array<char, TCP_RESP_TOPIC_MAX_SIZE + 1> topic{};

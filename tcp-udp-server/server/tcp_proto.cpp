@@ -296,9 +296,8 @@ void TcpResponse::serialize(const TcpResponse &response, std::byte *buffer) {
   memcpy(buffer, &response.udp_client_ip, sizeof(udp_client_ip));
   buffer += sizeof(udp_client_ip);
 
-  uint16_t udp_client_port_network = hton(response.udp_client_port);
-  memcpy(buffer, &udp_client_port_network, sizeof(udp_client_port_network));
-  buffer += sizeof(udp_client_port_network);
+  memcpy(buffer, &response.udp_client_port, sizeof(udp_client_port));
+  buffer += sizeof(udp_client_port);
 
   uint8_t cast_topic_size = static_cast<uint8_t>(response.topic_size);
   memcpy(buffer, &cast_topic_size, sizeof(cast_topic_size));
@@ -325,10 +324,8 @@ void TcpResponse::deserialize(TcpResponse &response, const std::byte *buffer,
   memcpy(&response.udp_client_ip, buffer, sizeof(udp_client_ip));
   buffer += sizeof(udp_client_ip);
 
-  uint16_t udp_client_port_network;
-  memcpy(&udp_client_port_network, buffer, sizeof(udp_client_port_network));
-  response.udp_client_port = ntoh(udp_client_port_network);
-  buffer += sizeof(udp_client_port_network);
+  memcpy(&response.udp_client_port, buffer, sizeof(udp_client_port));
+  buffer += sizeof(udp_client_port);
 
   uint8_t topic_size;
   memcpy(&topic_size, buffer, sizeof(topic_size));
