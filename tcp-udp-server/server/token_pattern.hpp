@@ -57,7 +57,7 @@ public:
 
 private:
   static constexpr bool is_valid_token(std::string_view token) {
-    return token == "*" || token == "+" || (token.size() > 1);
+    return token.size() > 0;
   }
 
   static constexpr bool is_wildcard(std::string_view token) {
