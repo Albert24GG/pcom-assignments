@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <string>
 #include <variant>
 
 // ##############################################################################
@@ -193,6 +194,13 @@ struct TcpResponsePayloadInt {
   uint8_t sign;
 
   /**
+   * @brief Converts the INT payload to a string representation.
+   *
+   * @return A string representation of the INT payload.
+   */
+  std::string to_string() const;
+
+  /**
    * @brief Serializes the INT payload into a byte buffer.
    * The caller is responsible for ensuring that the buffer is large enough to
    * hold the serialized data.
@@ -229,6 +237,13 @@ struct TcpResponsePayloadShortReal {
   // Value representing the absolute value of the short real number multiplied
   // by 100
   uint16_t value;
+
+  /**
+   * @brief Converts the SHORT_REAL payload to a string representation.
+   *
+   * @return A string representation of the SHORT_REAL payload.
+   */
+  std::string to_string() const;
 
   /**
    * @brief Serializes the SHORT_REAL payload into a byte buffer.
@@ -270,6 +285,13 @@ struct TcpResponsePayloadFloat {
   uint8_t exponent;
 
   /**
+   * @brief Converts the FLOAT payload to a string representation.
+   *
+   * @return A string representation of the FLOAT payload.
+   */
+  std::string to_string() const;
+
+  /**
    * @brief Serializes the FLOAT payload into a byte buffer.
    * The caller is responsible for ensuring that the buffer is large enough to
    * hold the serialized data.
@@ -306,6 +328,13 @@ struct TcpResponsePayloadFloat {
 struct TcpResponsePayloadString {
   std::array<char, TCP_RESP_STRING_MAX_SIZE + 1> value{};
   uint16_t value_size{};
+
+  /**
+   * @brief Converts the STRING payload to a string representation.
+   *
+   * @return A string representation of the STRING payload.
+   */
+  std::string to_string() const;
 
   /**
    * @brief Sets the STRING value and its size.

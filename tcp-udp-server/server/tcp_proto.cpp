@@ -1,5 +1,6 @@
 #include "tcp_proto.hpp"
 #include "../server/util.hpp"
+#include <cmath>
 #include <cstring>
 #include <stdexcept>
 #include <variant>
@@ -189,6 +190,12 @@ void TcpResponsePayloadInt::deserialize(TcpResponsePayloadInt &payload,
   payload.value = ntoh(value_network);
 }
 
+std::string TcpResponsePayloadInt::to_string() const {
+  int64_t signed_value =
+      static_cast<int64_t>(sign ? -1 : 1) * static_cast<int64_t>(value);
+  return std::to_string(signed_value);
+}
+
 void TcpResponsePayloadShortReal::serialize(
     const TcpResponsePayloadShortReal &payload, std::byte *buffer) {
   uint16_t value_network = hton(payload.value);
@@ -206,6 +213,17 @@ void TcpResponsePayloadShortReal::deserialize(
   uint16_t value_network;
   memcpy(&value_network, buffer, sizeof(value_network));
   payload.value = ntoh(value_network);
+}
+
+std::string TcpResponsePayloadShortReal::to_string() const {
+  static constexpr auto fmt = "%.2f";
+  float fvalue = static_cast<float>(value) / 100.0f;
+  size_t size = std::snprintf(nullptr, 0, fmt, fvalue) + 1;
+
+  std::string str(size, '\0');
+  std::snprintf(str.data(), size, fmt, fvalue);
+
+  return str;
 }
 
 void TcpResponsePayloadFloat::serialize(const TcpResponsePayloadFloat &payload,
@@ -237,6 +255,20 @@ void TcpResponsePayloadFloat::deserialize(TcpResponsePayloadFloat &payload,
   buffer += sizeof(value_network);
 
   memcpy(&payload.exponent, buffer, sizeof(exponent));
+}
+
+std::string TcpResponsePayloadFloat::to_string() const {
+  static constexpr auto fmt = "%.*f";
+  double dvalue = static_cast<double>(sign ? -1 : 1) *
+                  static_cast<double>(value) /
+                  static_cast<double>(std::pow(10, exponent));
+  size_t size =
+      std::snprintf(nullptr, 0, fmt, static_cast<int>(exponent), dvalue) + 1;
+
+  std::string str(size, '\0');
+  std::snprintf(str.data(), size, fmt, static_cast<int>(exponent), dvalue);
+
+  return str;
 }
 
 void TcpResponsePayloadString::serialize(
@@ -290,6 +322,10 @@ void TcpResponsePayloadString::set(const char *value_data, size_t size) {
   }
   memcpy(value.data(), value_data, size);
   value_size = size;
+}
+
+std::string TcpResponsePayloadString::to_string() const {
+  return std::string(value.data(), value_size);
 }
 
 void TcpResponse::serialize(const TcpResponse &response, std::byte *buffer) {
