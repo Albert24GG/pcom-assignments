@@ -80,3 +80,54 @@ template <typename T,
 inline void hash_combine(std::size_t &seed, const T &v) {
   seed = hash_mix(seed + 0x9e3779b9 + std::hash<T>()(v));
 }
+
+class ScopeGuard {
+public:
+  explicit ScopeGuard(std::function<void()> on_exit)
+      : on_exit_(std::move(on_exit)) {}
+
+  ScopeGuard(const ScopeGuard &) = delete;
+  ScopeGuard &operator=(const ScopeGuard &) = delete;
+
+  ScopeGuard(ScopeGuard &&other) noexcept
+      : on_exit_(std::move(other.on_exit_)) {
+    other.active_ = false;
+  }
+
+  ScopeGuard &operator=(ScopeGuard &&other) noexcept {
+    if (this != &other) {
+      on_exit_ = std::move(other.on_exit_);
+      other.active_ = false;
+    }
+    return *this;
+  }
+
+  ~ScopeGuard() {
+    if (active_) {
+      on_exit_();
+    }
+  }
+
+  void dismiss() noexcept { active_ = false; }
+
+private:
+  std::function<void()> on_exit_;
+  bool active_{true};
+};
+
+inline ScopeGuard make_scope_guard(std::function<void()> on_exit) {
+  return ScopeGuard(std::move(on_exit));
+}
+
+// Taken from c++23 std::unreachable's possible implementation
+// https://en.cppreference.com/w/cpp/utility/unreachable
+[[noreturn]] inline void unreachable() {
+  // Uses compiler specific extensions if possible.
+  // Even if no extension is used, undefined behavior is still raised by
+  // an empty function body and the noreturn attribute.
+#if defined(_MSC_VER) && !defined(__clang__) // MSVC
+  __assume(false);
+#else // GCC, Clang
+  __builtin_unreachable();
+#endif
+}
