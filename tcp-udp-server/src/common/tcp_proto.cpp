@@ -1,5 +1,5 @@
 #include "tcp_proto.hpp"
-#include "../server/util.hpp"
+#include "util.hpp"
 #include <cmath>
 #include <cstring>
 #include <stdexcept>

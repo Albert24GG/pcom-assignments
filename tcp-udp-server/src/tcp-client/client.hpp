@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../server/tcp_proto.hpp"
+#include "tcp_proto.hpp"
 #include <array>
 #include <memory>
 #include <netinet/in.h>

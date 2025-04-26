@@ -1,5 +1,5 @@
-#include "../server/util.hpp"
 #include "client.hpp"
+#include "util.hpp"
 #include <arpa/inet.h>
 #include <charconv>
 #include <iostream>

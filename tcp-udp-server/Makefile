@@ -1,27 +1,29 @@
-SERVER_SRC = $(shell echo src/server/{main,server,subscribers_registry,tcp_proto,tcp_utils,token_pattern,udp_proto}.cpp)
+SERVER_SRC = $(wildcard src/server/*.cpp)
 SERVER_OBJ = $(SERVER_SRC:.cpp=.o)
-SERVER_INC = 
 SERVER_BIN = server
 
-SUBSCRIBER_SRC = $(shell echo src/tcp-client/{main,client}.cpp src/server/{tcp_proto,tcp_utils,token_pattern}.cpp)
+SUBSCRIBER_SRC = $(wildcard src/tcp-client/*.cpp)
 SUBSCRIBER_OBJ = $(SUBSCRIBER_SRC:.cpp=.o)
-SUBSCRIBER_INC =
 SUBSCRIBER_BIN = subscriber
 
+COMMON_SRC = $(wildcard src/common/*.cpp)
+COMMON_OBJ = $(COMMON_SRC:.cpp=.o)
+COMMON_INC = src/common
+
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -O3
+CXXFLAGS = -std=c++17 -Wall -Wextra -O3 -I$(COMMON_INC)
 
 .PHONY: all
 all: $(SERVER_BIN) $(SUBSCRIBER_BIN)
 
-$(SERVER_BIN): $(SERVER_OBJ)
+$(SERVER_BIN): $(SERVER_OBJ) $(COMMON_OBJ)
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-$(SUBSCRIBER_BIN): $(SUBSCRIBER_OBJ)
+$(SUBSCRIBER_BIN): $(SUBSCRIBER_OBJ) $(COMMON_OBJ)
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 .PHONY: clean
 clean:
-	rm -f $(SERVER_OBJ) $(SUBSCRIBER_OBJ) $(SERVER_BIN) $(SUBSCRIBER_BIN)
+	rm -f $(SERVER_OBJ) $(SUBSCRIBER_OBJ) $(COMMON_OBJ) $(SERVER_BIN) $(SUBSCRIBER_BIN)
 
 

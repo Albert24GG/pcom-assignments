@@ -1,8 +1,8 @@
 #include "client.hpp"
-#include "../server/tcp_proto.hpp"
-#include "../server/tcp_utils.hpp"
-#include "../server/token_pattern.hpp"
-#include "../server/util.hpp"
+#include "tcp_proto.hpp"
+#include "tcp_utils.hpp"
+#include "token_pattern.hpp"
+#include "util.hpp"
 #include <arpa/inet.h>
 #include <cerrno>
 #include <cstring>
