@@ -80,10 +80,9 @@ Server::~Server() {
  * @param events The events to monitor (e.g., POLLIN, POLLOUT)
  */
 void Server::register_pollfd(int fd, short events) {
-  pollfd pfd{
-      .fd = fd,
-      .events = events,
-  };
+  pollfd pfd{};
+  pfd.fd = fd;
+  pfd.events = events;
   poll_fds_.push_back(pfd);
 }
 
