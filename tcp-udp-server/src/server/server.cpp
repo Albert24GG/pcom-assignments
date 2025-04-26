@@ -352,9 +352,6 @@ void Server::handle_tcp_request(size_t pollfd_index) {
         subscribers_registry_.unsubscribe_from_topic(sockfd, topic_pat);
       }
 
-      std::cout << "Client " << subscribers_registry_.get_subscriber_id(sockfd)
-                << (isSubscribe ? " subscribed to" : " unsubscribed from")
-                << " topic: " << topic_str << std::endl;
       guard.dismiss();
     } catch (const std::exception &e) {
       std::cerr << "Error "
