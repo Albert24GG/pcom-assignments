@@ -58,5 +58,5 @@ private:
   TcpMessage tcp_msg_{};
 
   SubscribersRegistry subscribers_registry_{};
-  std::vector<pollfd> poll_fds_{3};
+  std::vector<pollfd> poll_fds_{};
 };

@@ -401,78 +401,92 @@ void Server::run() {
       }
     }
 
-    for (size_t i = 0; i < poll_fds_.size(); ++i) {
-      if (poll_fds_[i].revents & POLLIN) {
-        if (poll_fds_[i].fd == STDIN_FILENO) {
-          handle_stdin_cmd(stopped);
-        } else if (poll_fds_[i].fd == udp_fd_) {
-          auto msg = handle_udp_msg();
+    // Check STDIN_FILENO
+    if (poll_fds_[2].revents & POLLIN) {
+      handle_stdin_cmd(stopped);
+    }
 
-          if (!msg.has_value()) {
+    // Check udp_fd_
+    if (poll_fds_[1].revents & POLLIN) {
+      do {
+        auto msg = handle_udp_msg();
+
+        if (!msg.has_value()) {
+          continue;
+        }
+
+        TokenPattern topic;
+        try {
+          std::string_view topic_str(udp_msg_.topic.data(),
+                                     udp_msg_.topic_size);
+          topic = TokenPattern::from_string(topic_str);
+        } catch (const std::exception &e) {
+          std::cerr << "Invalid topic pattern: " << e.what() << std::endl;
+          continue;
+        }
+
+        auto subscribers =
+            subscribers_registry_.retrieve_topic_subscribers(topic);
+
+        if (subscribers.empty()) {
+          continue;
+        }
+        auto &udp_sender_addr = msg.value();
+        prepare_tcp_response(udp_sender_addr);
+
+        for (auto &sub_sockfd : subscribers) {
+          if (sub_sockfd < 0) {
             continue;
           }
 
-          TokenPattern topic;
+          // Send the TCP message to the subscriber
           try {
-            std::string_view topic_str(udp_msg_.topic.data(),
-                                       udp_msg_.topic_size);
-            topic = TokenPattern::from_string(topic_str);
-          } catch (const std::exception &e) {
-            std::cerr << "Invalid topic pattern: " << e.what() << std::endl;
+            send_tcp_message(sub_sockfd);
+          } catch (const TcpConnectionClosed &e) {
+            std::cerr << "Failed to send TCP message. Client "
+                      << subscribers_registry_.get_subscriber_id(sub_sockfd)
+                      << " disconnected." << std::endl;
+            continue;
+          } catch (const TcpSocketException &e) {
+            std::cerr << "Error sending TCP message: " << e.what() << std::endl;
             continue;
           }
+        }
+      } while (false);
+    }
 
-          auto subscribers =
-              subscribers_registry_.retrieve_topic_subscribers(topic);
+    // Check listen_fd_
+    if (poll_fds_[0].revents & POLLIN) {
+      do {
+        // Accept a new TCP connection
+        int client_fd = accept(listen_fd_, nullptr, nullptr);
+        if (client_fd < 0) {
+          std::cerr << "Error accepting TCP connection: "
+                    << std::strerror(errno) << std::endl;
+          continue;
+        }
 
-          if (subscribers.empty()) {
-            continue;
-          }
-          auto &udp_sender_addr = msg.value();
-          prepare_tcp_response(udp_sender_addr);
+        // Disable Nagle's algorithm for the TCP client
+        int enable = 1;
+        if (setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, &enable,
+                       sizeof(enable)) < 0) {
+          std::cerr << "Error setting TCP_NODELAY: " << std::strerror(errno)
+                    << std::endl;
+          close(client_fd);
+          continue;
+        }
 
-          for (auto &sub_sockfd : subscribers) {
-            if (sub_sockfd < 0) {
-              continue;
-            }
+        // Add the new client fd to the pollfds
+        register_pollfd(client_fd, POLLIN);
+      } while (false);
+    }
 
-            // Send the TCP message to the subscriber
-            try {
-              send_tcp_message(sub_sockfd);
-            } catch (const TcpConnectionClosed &e) {
-              std::cerr << "Failed to send TCP message. Client "
-                        << subscribers_registry_.get_subscriber_id(sub_sockfd)
-                        << " disconnected." << std::endl;
-              continue;
-            } catch (const TcpSocketException &e) {
-              std::cerr << "Error sending TCP message: " << e.what()
-                        << std::endl;
-              continue;
-            }
-          }
+    // Check other pollfds (subscribers)
+    for (size_t i = 3; i < poll_fds_.size();) {
+      size_t initial_size = poll_fds_.size();
 
-        } else if (poll_fds_[i].fd == listen_fd_) {
-          // Accept a new TCP connection
-          int client_fd = accept(listen_fd_, nullptr, nullptr);
-          if (client_fd < 0) {
-            std::cerr << "Error accepting TCP connection: "
-                      << std::strerror(errno) << std::endl;
-            continue;
-          }
-
-          // Disable Nagle's algorithm for the TCP client
-          int enable = 1;
-          if (setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, &enable,
-                         sizeof(enable)) < 0) {
-            std::cerr << "Error setting TCP_NODELAY: " << std::strerror(errno)
-                      << std::endl;
-            close(client_fd);
-            continue;
-          }
-
-          // Add the new client fd to the pollfds
-          register_pollfd(client_fd, POLLIN);
-        } else {
+      do {
+        if (poll_fds_[i].revents & POLLIN) {
           int sockfd = poll_fds_[i].fd;
 
           try {
@@ -492,15 +506,21 @@ void Server::run() {
           }
 
           handle_tcp_request(i);
+        } else if (poll_fds_[i].revents & (POLLERR | POLLHUP)) {
+          int sockfd = poll_fds_[i].fd;
+
+          std::cout << "Client "
+                    << subscribers_registry_.get_subscriber_id(sockfd)
+                    << " disconnected." << std::endl;
+
+          disconnect_client(i);
+          continue;
         }
-      } else if (poll_fds_[i].revents & (POLLERR | POLLHUP)) {
-        int sockfd = poll_fds_[i].fd;
+      } while (false);
 
-        std::cout << "Client "
-                  << subscribers_registry_.get_subscriber_id(sockfd)
-                  << " disconnected." << std::endl;
-
-        disconnect_client(i);
+      // If we removed the current pollfd, we should not increment the index
+      if (initial_size <= poll_fds_.size()) {
+        ++i;
       }
     }
   }
