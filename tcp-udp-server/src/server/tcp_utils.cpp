@@ -1,7 +1,6 @@
 #include "tcp_utils.hpp"
 
 #include <cstring>
-#include <stdexcept>
 #include <sys/socket.h>
 
 void send_all(int sockfd, const std::byte *buffer, size_t buffer_size) {
@@ -35,12 +34,6 @@ void recv_all(int sockfd, std::byte *buffer, size_t buffer_size) {
   while (total_received < buffer_size) {
     ssize_t received = recv(sockfd, buffer, buffer_size - total_received, 0);
 
-    // if (received < 0) {
-    //   throw std::runtime_error("Failed to receive data with error: " +
-    //                            std::string(std::strerror(errno)));
-    // } else if (received == 0) {
-    //   throw std::runtime_error("Connection closed by peer");
-    // }
     if (received < 0) {
       if (errno == EINTR) {
         // Interrupted by a signal, retry receiving
