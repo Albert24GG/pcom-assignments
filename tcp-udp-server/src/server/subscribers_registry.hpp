@@ -86,6 +86,8 @@ public:
    * @param topic The topic to retrieve subscribers for
    * @return A set of socket file descriptors of subscribers subscribed to the
    * topic
+   *
+   * @throws std::invalid_argument if the given topic contains wildcards
    */
   auto retrieve_topic_subscribers(const TokenPattern &topic)
       -> std::unordered_set<int>;

@@ -413,17 +413,16 @@ void Server::run() {
         }
 
         TokenPattern topic;
+        std::unordered_set<int> subscribers;
         try {
           std::string_view topic_str(udp_msg_.topic.data(),
                                      udp_msg_.topic_size);
           topic = TokenPattern::from_string(topic_str);
+          subscribers = subscribers_registry_.retrieve_topic_subscribers(topic);
         } catch (const std::exception &e) {
           std::cerr << "Invalid topic pattern: " << e.what() << std::endl;
           continue;
         }
-
-        auto subscribers =
-            subscribers_registry_.retrieve_topic_subscribers(topic);
 
         if (subscribers.empty()) {
           continue;

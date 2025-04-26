@@ -1,5 +1,6 @@
 #include "token_pattern.hpp"
 #include "util.hpp"
+#include <queue>
 #include <stdexcept>
 
 bool TokenPattern::is_valid_pattern() const {
@@ -67,13 +68,24 @@ TokenPattern TokenPattern::from_string(std::string_view str) {
 
 bool TokenPattern::matches(const TokenPattern &other) const {
   if (other.has_wildcard()) {
-    throw std::invalid_argument("Other TokenPattern contains wildcards");
+    throw std::invalid_argument(
+        "The TokenPattern to match against contains wildcards");
   }
 
-  size_t this_index = 0;
-  size_t other_index = 0;
+  std::queue<std::pair<size_t, size_t>> positions{};
+  positions.push({0, 0});
 
-  while (this_index < tokens_.size() && other_index < other.tokens_.size()) {
+  while (!positions.empty()) {
+    auto [this_index, other_index] = positions.front();
+    positions.pop();
+
+    if (this_index == tokens_.size() && other_index == other.tokens_.size()) {
+      return true;
+    }
+
+    if (this_index >= tokens_.size() || other_index >= other.tokens_.size()) {
+      continue;
+    }
 
     if (tokens_[this_index] == "*") {
       ++this_index;
@@ -82,21 +94,23 @@ bool TokenPattern::matches(const TokenPattern &other) const {
         return true;
       }
 
-      while (other_index < other.tokens_.size() &&
-             other.tokens_[other_index] != tokens_[this_index]) {
-        ++other_index;
+      auto low_limit = other.tokens_.rend() - other_index;
+      auto it =
+          std::find(other.tokens_.rbegin(), low_limit, tokens_[this_index]);
+      while (it != low_limit) {
+        positions.push(
+            {this_index + 1, std::distance(it, other.tokens_.rend())});
+        ++it;
+        it = std::find(it, low_limit, tokens_[this_index]);
       }
 
     } else if (tokens_[this_index] == "+" ||
                tokens_[this_index] == other.tokens_[other_index]) {
-      ++this_index;
-      ++other_index;
-    } else {
-      return false;
+      positions.push({this_index + 1, other_index + 1});
     }
   }
 
-  return this_index == tokens_.size() && other_index == other.tokens_.size();
+  return false;
 }
 
 std::size_t TokenPattern::hashValue() const {
