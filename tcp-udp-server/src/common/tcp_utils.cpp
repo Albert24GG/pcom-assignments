@@ -15,11 +15,10 @@ void send_all(int sockfd, const std::byte *buffer, size_t buffer_size) {
         continue;
       } else if (errno == EPIPE || errno == ECONNRESET) {
         // Connection closed
-        throw TcpConnectionClosed("Failed to send data: " +
-                                  std::string(std::strerror(errno)));
+        throw TcpConnectionClosed("Connection closed by peer");
       }
       // Other send error
-      throw TcpTransmissionError("Failed to send data: " +
+      throw TcpTransmissionError("send() failed with error: " +
                                  std::string(std::strerror(errno)));
     }
 
@@ -39,7 +38,7 @@ void recv_all(int sockfd, std::byte *buffer, size_t buffer_size) {
         // Interrupted by a signal, retry receiving
         continue;
       }
-      throw TcpTransmissionError("Failed to receive data: " +
+      throw TcpTransmissionError("recv() failed with error: " +
                                  std::string(std::strerror(errno)));
 
     } else if (received == 0) {
