@@ -42,6 +42,12 @@ Matching-ul se face prin metoda `TokenPattern::matches(&other)`, care incearca s
 
 Eficienta implementarii vine atat din protocolul TCP folosit pentru comunicarea cu subscriberii (descris mai jos) care permite interpretarea rapida a mesajelor si folosirea unui buffer alocat o singura data, dar si din celelalte structuri de date folosite. De exemplu, `SubscribersRegistry` retine o asociere `topic_pattern -> subscribers` intr-un `std::unordered_map` care ajuta mult atunci cand mai multi subscriberi sunt abonati la acelasi topic, matching-ul facandu-se o singura data.
 
+### Multiplexare I/O
+
+Multiplexarea event loop-ului se face prin folosirea functiei `poll()`, asemanator cu implementarea din cadrul laboratorului.
+
+In scopul simplificarii implementarii, am ales ca mesajele tcp sa fie trimise/receptionate in mod blocant, folosind functiile `send_all()` si `recv_all()`, pentru a evita nevoia de a avea un buffer separat pentru fiecare conexiune.
+
 ### Ierarhie
 
 ```
@@ -131,3 +137,9 @@ Cateva detalii de implementare a protocolului:
 - orice string care intra in continutul unui mesaj va fi precedat de lungimea sa (excluzand terminatorul `\0`), iar string-ul este transmis fara terminatorul `\0`.
 - fiecare structura/payload are o lungime de serializare maxima exprimata prin constanta `MAX_SERIALIZED_SIZE`. Aceasta este folosita pentru a putea folosi buffere de lungime fixa pentru transmiterea si receptionarea mesajelor. De asemenea,
   lungimea serializata a mesajului curent se poate calcula prin apelul functiti `serialized_size()`.
+
+## Mentiuni
+
+- Mesajele de eroare, care sunt destul de folositoare, sunt dezactivate in scopul temei, dar pot fi activate compiland cu flagul `ENABLE_ERROR_MESSAGES`.
+- Pentru implementarea hash-ului unei clase implementate de mine, am folosit cod preluat din biblioteca [**boost**](https://www.boost.org/doc/libs/1_81_0/boost/container_hash/hash.hpp), asa cum e specificat si in comentariile din cod.
+- Pentru ca in cerinta este specificat ca toate fisierele sa fie amplasate in root, toate fisierele au fost copiate in root, iar `src/tcp-client/main.cpp` si `src/server/main.cpp` au fost redenumite in `client-main.cpp`, respectiv `server-main.cpp`. Cu toate acestea, ierarhia de fisiere prezentata mai sus poate fi folosita ca un pentru a intelege organizarea si relatia dintre fisiere.
