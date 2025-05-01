@@ -7,6 +7,10 @@
 #include <string>
 
 int main(int argc, char *argv[]) {
+#ifndef ENABLE_ERROR_MESSAGES
+  std::cerr.setstate(std::ios::badbit);
+#endif
+
   if (argc != 4) {
     std::cerr << "Usage: " << argv[0]
               << " <client_id> <server_ip> <server_port>" << std::endl;

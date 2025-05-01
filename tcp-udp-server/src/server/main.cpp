@@ -3,6 +3,10 @@
 #include <iostream>
 
 int main(int argc, char *argv[]) {
+#ifndef ENABLE_ERROR_MESSAGES
+  std::cerr.setstate(std::ios::badbit);
+#endif
+
   if (argc != 2) {
     std::cerr << "Usage: " << argv[0] << " <server_port>" << std::endl;
     return 1;
