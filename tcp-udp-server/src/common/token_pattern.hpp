@@ -15,7 +15,7 @@ public:
    * The string must represent a list of tokens separated by '/'
    * The valid tokens are
    * - non-empty string
-   * - '*' wildcard - matches 1 or more string tokens (non-greedy)
+   * - '*' wildcard - matches 1 or more string tokens (greedy)
    * - '+' wildcard - matches 1 string tokens
    *
    * @param str The string to parse
@@ -33,7 +33,7 @@ public:
    * The TokenPattern matched agains must only contain string tokens
    *
    * The matching rules are:
-   * - '*' matches 1 or more string tokens (non-greedy)
+   * - '*' matches 1 or more string tokens (greedy)
    * - '+' matches 1 string token
    * - string matches the same string
    *
