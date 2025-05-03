@@ -519,4 +519,9 @@ void Server::run() {
       }
     }
   }
+
+  // Cleanup remaining tcp connections
+  for (size_t i = 3; i < poll_fds_.size(); ++i) {
+    disconnect_client(i);
+  }
 }
