@@ -85,6 +85,8 @@ public:
   Client(std::string host, uint16_t port = 80)
       : host_(std::move(host)), port_(port) {}
 
+  ~Client() { close_connection(); }
+
   void set_connection_timeout(utils::Duration auto timeout) {
     connection_timeout_ =
         std::chrono::duration_cast<std::chrono::microseconds>(timeout);
