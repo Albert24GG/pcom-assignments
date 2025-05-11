@@ -65,6 +65,8 @@ public:
   Result(std::optional<Response> response, Error error)
       : response_(std::move(response)), error_(error) {}
 
+  Result() = default;
+
   operator bool() const { return response_.has_value(); }
   const Response &operator*() const { return *response_; }
   Response &operator*() { return *response_; }
