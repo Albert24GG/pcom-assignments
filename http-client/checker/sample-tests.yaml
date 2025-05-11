@@ -1,0 +1,70 @@
+# Sample tests
+sample_movies:
+  - &movie0
+    title: The Dark Knight
+    year: 2008
+    description: Batman saves the world, Joker dies IRL, oh wait
+    rating: 9
+  - &movie1
+    title: Idiocracy
+    year: 2006
+    description: Nostradamus was so wrong... this nails it pretty well for our future
+    rating: 6.5
+  - &movie2
+    title: The Lord of the Rings 1-3
+    year: 2001
+    description: It's the homework that's never started as takes longest to finish.
+    rating: 6.5
+
+scripts:
+  # this is the full test referncing all the others
+  full: ["users", "movies", "collections"]
+  # you can invoke specific scripts using `--script TEST_NAME`
+  users: [
+    ["login_admin", {}],
+    ["add_user", {}], ["get_users", {}],
+    ["logout_admin", {}],
+    ["login", {}], ["get_access", {}], ["logout", {}]
+  ]
+  movies: [
+    ["ensure_user_access", {}],
+    ["get_movies", {"expect_count": false}],
+    ["add_movie", {"movie_obj": *movie0}],
+    ["add_movie", {"movie_obj": *movie1}],
+    ["get_movies", {"expect_count": 2}],
+    ["get_movie", {"movie_idx": 0, "expect_movie": {"title": "The Dark Knight", "year": 2008}}],
+    ["delete_movie", {"movie_idx": 1}],
+    ["get_movie", {"movie_idx": 0, "expect_movie": {"title": "The Dark Knight", "year": 2008}}],
+    ["get_movies", {"expect_count": 1}],
+    ["logout", {}], ["exit", {}]
+  ]
+  collections: [
+    ["ensure_user_access", {}],
+    ["get_movies", {"expect_count": None}],
+    ["get_collections", {"expect_count": 0}],
+    ["add_movie", {"movie_obj": *movie0}],
+    ["add_movie", {"movie_obj": *movie1}],
+    ["add_movie", {"movie_obj": *movie2}],
+    ["get_movies", {"expect_count": 3}],
+    ["add_collection", {"collection_obj": {"title": "Top IMDB", "movie_idx": [0, 2]}}],
+    ["add_collection", {"collection_obj": {"title": "Must See", "movie_idx": [1, 2]}}],
+    ["get_collections", {"expect_count": 2, "expect_titles": ["Top IMDB", "Must See"]}],
+    ["get_collection", {"collection_idx": 0, "expect_collection": {"title": "Top IMDB"},
+      "expect_movies": ["The Dark Knight", "The Lord of the Rings 1-3"]}],
+    ["delete_collection", {"collection_idx": 1}],
+    ["get_collections", {"expect_count": 1, "expect_titles": ["Top IMDB"]}],
+    ["logout", {}], ["exit", {}] 
+  ]
+  # use this script to clean all test_* users
+  CLEANUP: [
+    ["login_admin", {}],
+    ["get_users", {}], ["delete_all_users", { "delete_pattern": "^test_.+" }],
+    ["logout_admin", {}], ["exit", {}] 
+  ]
+  # use this script to get back an interactive CLI after automatic login
+  SHELL: [
+    ["ensure_user_access", {}],
+    ["shell", {}],
+    ["logout", {}], ["exit", {}] 
+  ]
+
