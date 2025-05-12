@@ -305,6 +305,76 @@ void Cli::handle_logout_admin() {
   });
 }
 
+void Cli::handle_login_user() {
+  std::string admin_username;
+  if (auto args = read_and_parse_arg_line(line_buffer_);
+      args && args->first == "admin_username") {
+    admin_username = std::move(args->second);
+  } else {
+    print_error(
+        "Invalid admin username format. Expected 'admin_username=<value>'");
+    return;
+  }
+
+  std::string username;
+  if (auto args = read_and_parse_arg_line(line_buffer_);
+      args && args->first == "username") {
+    username = std::move(args->second);
+  } else {
+    print_error("Invalid username format. Expected 'username=<value>'");
+    return;
+  }
+
+  std::string password;
+  if (auto args = read_and_parse_arg_line(line_buffer_);
+      args && args->first == "password") {
+    password = std::move(args->second);
+  } else {
+    print_error("Invalid password format. Expected 'password=<value>'");
+    return;
+  }
+
+  const static auto route = std::format("{}/user/login", BASE_ROUTE);
+  const json payload = {
+      {"admin_username", admin_username},
+      {"username", username},
+      {"password", password},
+  };
+  const auto result = perform_http_request_with_retry(
+      [&] { return http_client_.Post(route, payload.dump(), http_headers_); });
+  handle_result(result, [this](const http::Response &response) {
+    print_success("User logged in successfully");
+    // Extract the session cookie from the response
+    auto cookie_header = response.headers.find("Set-Cookie");
+
+    if (cookie_header != response.headers.end()) {
+      auto session_cookie =
+          SESSION_COOKIE_PATTERN.search(cookie_header->second);
+      if (session_cookie) {
+        http_headers_.insert_or_assign("Cookie", std::move(session_cookie));
+      }
+    }
+  });
+}
+
+void Cli::handle_logout_user() {
+  const static auto route = std::format("{}/user/logout", BASE_ROUTE);
+  const auto result = perform_http_request_with_retry(
+      [&] { return http_client_.Get(route, http_headers_); });
+  handle_result(result, [this](const http::Response &response) {
+    print_success("User logged out successfully");
+    // Remove the session cookie from the headers
+    auto cookie_header = http_headers_.find("Cookie");
+    if (cookie_header != http_headers_.end()) {
+      auto session_cookie =
+          SESSION_COOKIE_PATTERN.search(cookie_header->second);
+      if (session_cookie) {
+        http_headers_.erase(cookie_header);
+      }
+    }
+  });
+}
+
 void Cli::handle_exit() { should_exit_ = true; }
 
 void Cli::run() {
@@ -355,6 +425,12 @@ void Cli::run() {
       break;
     case Command::LOGOUT_ADMIN:
       handle_logout_admin();
+      break;
+    case Command::LOGIN_USER:
+      handle_login_user();
+      break;
+    case Command::LOGOUT_USER:
+      handle_logout_user();
       break;
     default:
       std::cerr << "Invalid command\n";
