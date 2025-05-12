@@ -27,6 +27,7 @@ private:
   void handle_logout_admin();
   void handle_login_user();
   void handle_logout_user();
+  void handle_get_access();
   void handle_exit();
 
   void

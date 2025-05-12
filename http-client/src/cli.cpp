@@ -372,9 +372,37 @@ void Cli::handle_logout_user() {
         http_headers_.erase(cookie_header);
       }
     }
+    // Remove the JWT token from the headers
+    auto jwt_token_header = http_headers_.find("Authorization");
+    if (jwt_token_header != http_headers_.end()) {
+      http_headers_.erase(jwt_token_header);
+    }
   });
 }
 
+void Cli::handle_get_access() {
+  const static auto route = std::format("{}/library/access", BASE_ROUTE);
+  const auto result = perform_http_request_with_retry(
+      [&] { return http_client_.Get(route, http_headers_); });
+  handle_result(result, [this](const http::Response &response) {
+    const json response_json = json::parse(response.body, nullptr, false);
+    if (response_json.is_discarded()) {
+      print_error("Failed to parse JSON response");
+      return;
+    }
+
+    if (const auto jwt_token = response_json.find("token");
+        jwt_token != response_json.end()) {
+      print_success("JWT token retrieved successfully");
+      // Add the JWT token to the headers
+      http_headers_.insert_or_assign(
+          "Authorization",
+          std::format("Bearer {}", jwt_token.value().get<std::string_view>()));
+    } else {
+      print_error("'token' key not found in the response");
+    }
+  });
+}
 void Cli::handle_exit() { should_exit_ = true; }
 
 void Cli::run() {
@@ -431,6 +459,9 @@ void Cli::run() {
       break;
     case Command::LOGOUT_USER:
       handle_logout_user();
+      break;
+    case Command::GET_ACCESS:
+      handle_get_access();
       break;
     default:
       std::cerr << "Invalid command\n";
