@@ -71,13 +71,23 @@ constexpr auto SESSION_COOKIE_PATTERN = ctre::match<"session=[^;]*">;
  * @param line_buffer The buffer to store the input line.
  * @return An optional pair of strings representing the key and value.
  */
+template <typename ValueType = std::string>
 [[nodiscard]] auto read_and_parse_arg_line(std::string &line_buffer)
-    -> std::optional<std::pair<std::string, std::string>> {
+    -> std::optional<std::pair<std::string, ValueType>> {
   do {
     std::getline(std::cin, line_buffer);
   } while (line_buffer.empty());
   if (auto [whole, arg, value] = ARG_LINE_PATTERN.match(line_buffer); whole) {
-    return {std::make_pair(arg.to_string(), value.to_string())};
+    if constexpr (std::is_arithmetic_v<ValueType>) {
+      if (auto parsed_value = value.to_optional_number<ValueType>();
+          parsed_value) {
+        return {std::make_pair(arg.to_string(), *parsed_value)};
+      } else {
+        return std::nullopt;
+      }
+    } else {
+      return {std::make_pair(arg.to_string(), value.to_string())};
+    }
   }
   return std::nullopt;
 }
