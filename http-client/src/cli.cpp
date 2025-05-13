@@ -6,6 +6,7 @@
 #include <format>
 #include <functional>
 #include <iostream>
+#include <type_traits>
 
 namespace {
 enum class Command {
@@ -128,6 +129,10 @@ void print_success(std::string_view message) {
 
 void print_error(std::string_view message) {
   std::cout << "ERROR: " << message << "\n";
+}
+
+std::string dump_json_pretty(const nlohmann::json &json) {
+  return json.dump(2);
 }
 
 } // namespace
@@ -413,6 +418,196 @@ void Cli::handle_get_access() {
     }
   });
 }
+
+void Cli::handle_get_movies() {
+  const static auto route = std::format("{}/library/movies", BASE_ROUTE);
+  const auto result = perform_http_request_with_retry(
+      [&] { return http_client_.Get(route, http_headers_); });
+  handle_result(result, [](const http::Response &response) {
+    const json response_json = json::parse(response.body, nullptr, false);
+    if (response_json.is_discarded()) {
+      print_error("Failed to parse JSON response");
+      return;
+    }
+
+    if (const auto movies = response_json.find("movies");
+        movies != response_json.end()) {
+      std::ostringstream os;
+      os << "Movies retrieved successfully";
+      bool is_success = true;
+      for (size_t i = 0; i < movies->size(); ++i) {
+        const auto title = (*movies)[i].find("title");
+        const auto id = (*movies)[i].find("id");
+        if (title != (*movies)[i].end() && id != (*movies)[i].end()) {
+          os << "\n#" << *id << " " << *title;
+        } else {
+          print_error("Invalid movie data format");
+          is_success = false;
+          break;
+        }
+      }
+      if (is_success) {
+        print_success(os.str());
+      }
+    } else {
+      print_error("'movies' key not found in the response");
+    }
+  });
+}
+
+void Cli::handle_get_movie() {
+  size_t id;
+  if (auto args = read_and_parse_arg_line<size_t>(line_buffer_);
+      args && args->first == "id") {
+    id = args->second;
+  } else {
+    print_error("Invalid movie ID format. Expected 'id=<value>'");
+    return;
+  }
+
+  const auto route = std::format("{}/library/movies/{}", BASE_ROUTE, id);
+  const auto result = perform_http_request_with_retry(
+      [&] { return http_client_.Get(route, http_headers_); });
+  handle_result(result, [](const http::Response &response) {
+    const json response_json = json::parse(response.body, nullptr, false);
+    if (response_json.is_discarded()) {
+      print_error("Failed to parse JSON response");
+      return;
+    }
+    print_success(std::format("Movie retrieved successfully\n{}",
+                              dump_json_pretty(response_json)));
+  });
+}
+
+void Cli::handle_add_movie() {
+  std::string title;
+  if (auto args = read_and_parse_arg_line(line_buffer_);
+      args && args->first == "title") {
+    title = std::move(args->second);
+  } else {
+    print_error("Invalid title format. Expected 'title=<value>'");
+    return;
+  }
+
+  size_t year;
+  if (auto args = read_and_parse_arg_line<size_t>(line_buffer_);
+      args && args->first == "year") {
+    year = args->second;
+  } else {
+    print_error("Invalid year format. Expected 'year=<value>'");
+    return;
+  }
+
+  std::string description;
+  if (auto args = read_and_parse_arg_line(line_buffer_);
+      args && args->first == "description") {
+    description = std::move(args->second);
+  } else {
+    print_error("Invalid description format. Expected 'description=<value>'");
+    return;
+  }
+
+  double rating;
+  if (auto args = read_and_parse_arg_line<double>(line_buffer_);
+      args && args->first == "rating") {
+    rating = args->second;
+  } else {
+    print_error("Invalid rating format. Expected 'rating=<value>'");
+    return;
+  }
+
+  const static auto route = std::format("{}/library/movies", BASE_ROUTE);
+  const json payload = {
+      {"title", title},
+      {"year", year},
+      {"description", description},
+      {"rating", rating},
+  };
+  const auto result = perform_http_request_with_retry(
+      [&] { return http_client_.Post(route, payload.dump(), http_headers_); });
+  handle_result(result, [](const http::Response &response) {
+    print_success("Movie added successfully");
+  });
+}
+
+void Cli::handle_update_movie() {
+  size_t id;
+  if (auto args = read_and_parse_arg_line<size_t>(line_buffer_);
+      args && args->first == "id") {
+    id = args->second;
+  } else {
+    print_error("Invalid movie ID format. Expected 'id=<value>'");
+    return;
+  }
+
+  std::string title;
+  if (auto args = read_and_parse_arg_line(line_buffer_);
+      args && args->first == "title") {
+    title = std::move(args->second);
+  } else {
+    print_error("Invalid title format. Expected 'title=<value>'");
+    return;
+  }
+
+  size_t year;
+  if (auto args = read_and_parse_arg_line<size_t>(line_buffer_);
+      args && args->first == "year") {
+    year = args->second;
+  } else {
+    print_error("Invalid year format. Expected 'year=<value>'");
+    return;
+  }
+
+  std::string description;
+  if (auto args = read_and_parse_arg_line(line_buffer_);
+      args && args->first == "description") {
+    description = std::move(args->second);
+  } else {
+    print_error("Invalid description format. Expected 'description=<value>'");
+    return;
+  }
+
+  double rating;
+  if (auto args = read_and_parse_arg_line<double>(line_buffer_);
+      args && args->first == "rating") {
+    rating = args->second;
+  } else {
+    print_error("Invalid rating format. Expected 'rating=<value>'");
+    return;
+  }
+
+  const auto route = std::format("{}/library/movies/{}", BASE_ROUTE, id);
+  const json payload = {
+      {"title", title},
+      {"year", year},
+      {"description", description},
+      {"rating", rating},
+  };
+  const auto result = perform_http_request_with_retry(
+      [&] { return http_client_.Put(route, payload.dump(), http_headers_); });
+  handle_result(result, [](const http::Response &response) {
+    print_success("Movie updated successfully");
+  });
+}
+
+void Cli::handle_delete_movie() {
+  size_t id;
+  if (auto args = read_and_parse_arg_line<size_t>(line_buffer_);
+      args && args->first == "id") {
+    id = args->second;
+  } else {
+    print_error("Invalid movie ID format. Expected 'id=<value>'");
+    return;
+  }
+
+  const auto route = std::format("{}/library/movies/{}", BASE_ROUTE, id);
+  const auto result = perform_http_request_with_retry(
+      [&] { return http_client_.Delete(route, http_headers_); });
+  handle_result(result, [](const http::Response &response) {
+    print_success("Movie deleted successfully");
+  });
+}
+
 void Cli::handle_exit() { should_exit_ = true; }
 
 void Cli::run() {
@@ -472,6 +667,21 @@ void Cli::run() {
       break;
     case Command::GET_ACCESS:
       handle_get_access();
+      break;
+    case Command::GET_MOVIES:
+      handle_get_movies();
+      break;
+    case Command::GET_MOVIE:
+      handle_get_movie();
+      break;
+    case Command::ADD_MOVIE:
+      handle_add_movie();
+      break;
+    case Command::UPDATE_MOVIE:
+      handle_update_movie();
+      break;
+    case Command::DELETE_MOVIE:
+      handle_delete_movie();
       break;
     default:
       std::cerr << "Invalid command\n";

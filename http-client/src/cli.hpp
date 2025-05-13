@@ -28,6 +28,11 @@ private:
   void handle_login_user();
   void handle_logout_user();
   void handle_get_access();
+  void handle_get_movies();
+  void handle_get_movie();
+  void handle_add_movie();
+  void handle_update_movie();
+  void handle_delete_movie();
   void handle_exit();
 
   void
