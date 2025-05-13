@@ -63,34 +63,43 @@ Command from_str(std::string_view str) {
   return Command::INVALID;
 }
 
-constexpr auto ARG_LINE_PATTERN = ctre::match<"^([[:graph:]]+)=(.+)$">;
 constexpr auto SESSION_COOKIE_PATTERN = ctre::match<"session=[^;]*">;
 
 /**
  * Read a line from standard input and parse it into a key-value pair.
  *
  * @param line_buffer The buffer to store the input line.
+ * @param arg_name The name of the argument to read.
+ * @param delimiter The delimiter used to separate the key and value.
  * @return An optional pair of strings representing the key and value.
  */
 template <typename ValueType = std::string>
-[[nodiscard]] auto read_and_parse_arg_line(std::string &line_buffer)
-    -> std::optional<std::pair<std::string, ValueType>> {
+[[nodiscard]] auto read_and_parse_arg_line(std::string &line_buffer,
+                                           std::string_view arg_name,
+                                           std::string_view delimiter = "=")
+    -> std::optional<ValueType> {
+  std::cout << arg_name << delimiter;
+  std::flush(std::cout);
+
   do {
     std::getline(std::cin, line_buffer);
   } while (line_buffer.empty());
-  if (auto [whole, arg, value] = ARG_LINE_PATTERN.match(line_buffer); whole) {
-    if constexpr (std::is_arithmetic_v<ValueType>) {
-      if (auto parsed_value = value.to_optional_number<ValueType>();
-          parsed_value) {
-        return {std::make_pair(arg.to_string(), *parsed_value)};
-      } else {
-        return std::nullopt;
-      }
+
+  if constexpr (std::is_arithmetic_v<ValueType>) {
+    ValueType value{};
+    if (auto [_, ec] = std::from_chars(
+            line_buffer.data(), line_buffer.data() + line_buffer.size(), value);
+        ec == std::errc()) {
+      return value;
     } else {
-      return {std::make_pair(arg.to_string(), value.to_string())};
+      return std::nullopt;
     }
+  } else if constexpr (std::is_constructible_v<ValueType, std::string>) {
+    return ValueType(line_buffer);
+  } else {
+    static_assert(std::is_constructible_v<ValueType, std::string>,
+                  "Unsupported type for read_and_parse_arg_line");
   }
-  return std::nullopt;
 }
 
 /**
@@ -172,18 +181,18 @@ using json = nlohmann::json;
 
 void Cli::handle_login_admin() {
   std::string username;
-  if (auto args = read_and_parse_arg_line(line_buffer_);
-      args && args->first == "username") {
-    username = std::move(args->second);
+  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "username");
+      arg_value) {
+    username = std::move(*arg_value);
   } else {
     print_error("Invalid username format. Expected 'username=<value>'");
     return;
   }
 
   std::string password;
-  if (auto args = read_and_parse_arg_line(line_buffer_);
-      args && args->first == "password") {
-    password = std::move(args->second);
+  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "password");
+      arg_value) {
+    password = std::move(*arg_value);
   } else {
     print_error("Invalid password format. Expected 'password=<value>'");
     return;
@@ -214,18 +223,18 @@ void Cli::handle_login_admin() {
 
 void Cli::handle_add_user() {
   std::string username;
-  if (auto args = read_and_parse_arg_line(line_buffer_);
-      args && args->first == "username") {
-    username = std::move(args->second);
+  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "username");
+      arg_value) {
+    username = std::move(*arg_value);
   } else {
     print_error("Invalid username format. Expected 'username=<value>'");
     return;
   }
 
   std::string password;
-  if (auto args = read_and_parse_arg_line(line_buffer_);
-      args && args->first == "password") {
-    password = std::move(args->second);
+  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "password");
+      arg_value) {
+    password = std::move(*arg_value);
   } else {
     print_error("Invalid password format. Expected 'password=<value>'");
     return;
@@ -286,9 +295,9 @@ void Cli::handle_get_users() {
 
 void Cli::handle_delete_user() {
   std::string username;
-  if (auto args = read_and_parse_arg_line(line_buffer_);
-      args && args->first == "username") {
-    username = std::move(args->second);
+  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "username");
+      arg_value) {
+    username = std::move(*arg_value);
   } else {
     print_error("Invalid username format. Expected 'username=<value>'");
     return;
@@ -322,9 +331,9 @@ void Cli::handle_logout_admin() {
 
 void Cli::handle_login_user() {
   std::string admin_username;
-  if (auto args = read_and_parse_arg_line(line_buffer_);
-      args && args->first == "admin_username") {
-    admin_username = std::move(args->second);
+  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "admin_username");
+      arg_value) {
+    admin_username = std::move(*arg_value);
   } else {
     print_error(
         "Invalid admin username format. Expected 'admin_username=<value>'");
@@ -332,18 +341,18 @@ void Cli::handle_login_user() {
   }
 
   std::string username;
-  if (auto args = read_and_parse_arg_line(line_buffer_);
-      args && args->first == "username") {
-    username = std::move(args->second);
+  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "username");
+      arg_value) {
+    username = std::move(*arg_value);
   } else {
     print_error("Invalid username format. Expected 'username=<value>'");
     return;
   }
 
   std::string password;
-  if (auto args = read_and_parse_arg_line(line_buffer_);
-      args && args->first == "password") {
-    password = std::move(args->second);
+  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "password");
+      arg_value) {
+    password = std::move(*arg_value);
   } else {
     print_error("Invalid password format. Expected 'password=<value>'");
     return;
@@ -457,9 +466,9 @@ void Cli::handle_get_movies() {
 
 void Cli::handle_get_movie() {
   size_t id;
-  if (auto args = read_and_parse_arg_line<size_t>(line_buffer_);
-      args && args->first == "id") {
-    id = args->second;
+  if (auto arg_value = read_and_parse_arg_line<size_t>(line_buffer_, "id");
+      arg_value) {
+    id = *arg_value;
   } else {
     print_error("Invalid movie ID format. Expected 'id=<value>'");
     return;
@@ -481,36 +490,36 @@ void Cli::handle_get_movie() {
 
 void Cli::handle_add_movie() {
   std::string title;
-  if (auto args = read_and_parse_arg_line(line_buffer_);
-      args && args->first == "title") {
-    title = std::move(args->second);
+  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "title");
+      arg_value) {
+    title = std::move(*arg_value);
   } else {
     print_error("Invalid title format. Expected 'title=<value>'");
     return;
   }
 
   size_t year;
-  if (auto args = read_and_parse_arg_line<size_t>(line_buffer_);
-      args && args->first == "year") {
-    year = args->second;
+  if (auto arg_value = read_and_parse_arg_line<size_t>(line_buffer_, "year");
+      arg_value) {
+    year = *arg_value;
   } else {
     print_error("Invalid year format. Expected 'year=<value>'");
     return;
   }
 
   std::string description;
-  if (auto args = read_and_parse_arg_line(line_buffer_);
-      args && args->first == "description") {
-    description = std::move(args->second);
+  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "description");
+      arg_value) {
+    description = std::move(*arg_value);
   } else {
     print_error("Invalid description format. Expected 'description=<value>'");
     return;
   }
 
   double rating;
-  if (auto args = read_and_parse_arg_line<double>(line_buffer_);
-      args && args->first == "rating") {
-    rating = args->second;
+  if (auto arg_value = read_and_parse_arg_line<double>(line_buffer_, "rating");
+      arg_value) {
+    rating = *arg_value;
   } else {
     print_error("Invalid rating format. Expected 'rating=<value>'");
     return;
@@ -532,45 +541,45 @@ void Cli::handle_add_movie() {
 
 void Cli::handle_update_movie() {
   size_t id;
-  if (auto args = read_and_parse_arg_line<size_t>(line_buffer_);
-      args && args->first == "id") {
-    id = args->second;
+  if (auto arg_value = read_and_parse_arg_line<size_t>(line_buffer_, "id");
+      arg_value) {
+    id = *arg_value;
   } else {
     print_error("Invalid movie ID format. Expected 'id=<value>'");
     return;
   }
 
   std::string title;
-  if (auto args = read_and_parse_arg_line(line_buffer_);
-      args && args->first == "title") {
-    title = std::move(args->second);
+  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "title");
+      arg_value) {
+    title = std::move(*arg_value);
   } else {
     print_error("Invalid title format. Expected 'title=<value>'");
     return;
   }
 
   size_t year;
-  if (auto args = read_and_parse_arg_line<size_t>(line_buffer_);
-      args && args->first == "year") {
-    year = args->second;
+  if (auto arg_value = read_and_parse_arg_line<size_t>(line_buffer_, "year");
+      arg_value) {
+    year = *arg_value;
   } else {
     print_error("Invalid year format. Expected 'year=<value>'");
     return;
   }
 
   std::string description;
-  if (auto args = read_and_parse_arg_line(line_buffer_);
-      args && args->first == "description") {
-    description = std::move(args->second);
+  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "description");
+      arg_value) {
+    description = std::move(*arg_value);
   } else {
     print_error("Invalid description format. Expected 'description=<value>'");
     return;
   }
 
   double rating;
-  if (auto args = read_and_parse_arg_line<double>(line_buffer_);
-      args && args->first == "rating") {
-    rating = args->second;
+  if (auto arg_value = read_and_parse_arg_line<double>(line_buffer_, "rating");
+      arg_value) {
+    rating = *arg_value;
   } else {
     print_error("Invalid rating format. Expected 'rating=<value>'");
     return;
@@ -592,9 +601,9 @@ void Cli::handle_update_movie() {
 
 void Cli::handle_delete_movie() {
   size_t id;
-  if (auto args = read_and_parse_arg_line<size_t>(line_buffer_);
-      args && args->first == "id") {
-    id = args->second;
+  if (auto arg_value = read_and_parse_arg_line<size_t>(line_buffer_, "id");
+      arg_value) {
+    id = *arg_value;
   } else {
     print_error("Invalid movie ID format. Expected 'id=<value>'");
     return;
