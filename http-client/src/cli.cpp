@@ -892,13 +892,15 @@ void Cli::run() {
     for (const auto &[header, value] : req.headers) {
       os << header << " - " << value << "\n";
     }
+    os << "BODY: " << req.body << "\n";
 
     os << "\n\nResponse:\n"
        << res.version << " - " << res.status_code << " - " << res.status_message
-       << "\nBODY: " << res.body << "\nHEADERS:\n";
+       << "\nHEADERS:\n";
     for (const auto &[header, value] : res.headers) {
       os << header << " - " << value << "\n";
     }
+    os << "BODY: " << res.body << "\n";
     LOG_INFO("{}", os.str());
   };
   http_client_.set_logger(log_fn);
