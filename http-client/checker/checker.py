@@ -119,7 +119,9 @@ def expect_print_output(p, ignore_error=False):
 
 def extract_list_items(output):
     matches = re.findall(RE_EXTRACT_LIST_ITEM, output, re.I | re.M)
-    return [(val[0].strip(), val[1].strip()) for val in matches]
+    items = [(val[0].strip(), val[1].strip()) for val in matches]
+    items.sort()
+    return items
 
 def extract_object_field_vals(output, field):
     matches = re.findall(RE_EXTRACT_OBJ_FIELD % (field, field), output, re.I | re.M)
