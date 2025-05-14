@@ -169,8 +169,16 @@ void Cli::handle_result(
     print_error(to_str(error));
   };
   auto default_on_response_error = [](const http::Response &response) {
-    print_error(
-        std::format("{} - {}", response.status_code, response.status_message));
+    const auto response_json =
+        nlohmann::json::parse(response.body, nullptr, false);
+    if (!response.body.empty() && !response_json.is_discarded()) {
+      print_error(std::format("{} - {}\n{}", response.status_code,
+                              response.status_message,
+                              dump_json_pretty(response_json)));
+    } else {
+      print_error(std::format("{} - {}", response.status_code,
+                              response.status_message));
+    }
   };
 
   handle_result(result, on_response_ok, default_on_response_error,
