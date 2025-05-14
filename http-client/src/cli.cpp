@@ -617,6 +617,266 @@ void Cli::handle_delete_movie() {
   });
 }
 
+void Cli::handle_get_collections() {
+  const static auto route = std::format("{}/library/collections", BASE_ROUTE);
+  const auto result = perform_http_request_with_retry(
+      [&] { return http_client_.Get(route, http_headers_); });
+  handle_result(result, [](const http::Response &response) {
+    const json response_json = json::parse(response.body, nullptr, false);
+    if (response_json.is_discarded()) {
+      print_error("Failed to parse JSON response");
+      return;
+    }
+
+    if (const auto collections = response_json.find("collections");
+        collections != response_json.end()) {
+      std::ostringstream os;
+      os << "Collections retrieved successfully\n";
+      bool is_success = true;
+      for (size_t i = 0; i < collections->size(); ++i) {
+        const auto title = (*collections)[i].find("title");
+        const auto id = (*collections)[i].find("id");
+        if (title != (*collections)[i].end() && id != (*collections)[i].end()) {
+          os << "#" << *id << " " << *title;
+          if (i + 1 != collections->size()) {
+            os << "\n";
+          }
+        } else {
+          print_error("Invalid collection data format");
+          is_success = false;
+          break;
+        }
+      }
+      if (is_success) {
+        print_success(os.str());
+      }
+    } else {
+      print_error("'collections' key not found in the response");
+    }
+  });
+}
+
+void Cli::handle_get_collection() {
+  size_t id;
+  if (auto arg_value = read_and_parse_arg_line<size_t>(line_buffer_, "id");
+      arg_value) {
+    id = *arg_value;
+  } else {
+    print_error("Invalid collection ID format. Expected 'id=<value>'");
+    return;
+  }
+
+  const auto route = std::format("{}/library/collections/{}", BASE_ROUTE, id);
+  const auto result = perform_http_request_with_retry(
+      [&] { return http_client_.Get(route, http_headers_); });
+  handle_result(result, [](const http::Response &response) {
+    const json response_json = json::parse(response.body, nullptr, false);
+    if (response_json.is_discarded()) {
+      print_error("Failed to parse JSON response");
+      return;
+    }
+    std::ostringstream os;
+    os << "Collection retrieved successfully\n";
+
+    const auto title = response_json.find("title");
+    const auto owner = response_json.find("owner");
+    const auto movies = response_json.find("movies");
+    bool is_success = true;
+
+    if (title != response_json.end() && owner != response_json.end() &&
+        movies != response_json.end()) {
+      os << "title: " << *title << "\n" << "owner: " << *owner;
+
+      for (size_t i = 0; i < movies->size(); ++i) {
+        const auto title = (*movies)[i].find("title");
+        const auto id = (*movies)[i].find("id");
+
+        if (title != (*movies)[i].end() && id != (*movies)[i].end()) {
+          os << "\n#" << *id << ": " << *title;
+        } else {
+          print_error("Invalid movie data format");
+          is_success = false;
+          break;
+        }
+      }
+
+      if (is_success) {
+        print_success(os.str());
+      }
+    } else {
+      print_error("Invalid collection data format");
+      is_success = false;
+    }
+  });
+}
+
+void Cli::handle_add_collection() {
+  std::string title;
+  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "title");
+      arg_value) {
+    title = std::move(*arg_value);
+  } else {
+    print_error("Invalid title format. Expected 'title=<value>'");
+    return;
+  }
+
+  size_t num_movies;
+  if (auto arg_value =
+          read_and_parse_arg_line<size_t>(line_buffer_, "num_movies");
+      arg_value) {
+    num_movies = *arg_value;
+  } else {
+    print_error(
+        "Invalid number of movies format. Expected 'num_movies=<value>'");
+    return;
+  }
+
+  std::vector<size_t> movie_ids;
+  for (size_t i = 0; i < num_movies; ++i) {
+    size_t movie_id;
+    if (auto arg_value = read_and_parse_arg_line<size_t>(
+            line_buffer_, std::format("movie_id[{}]", i));
+        arg_value) {
+      movie_id = *arg_value;
+      movie_ids.push_back(movie_id);
+    } else {
+      print_error("Invalid movie ID format. Expected 'movie_id=<value>'");
+      return;
+    }
+  }
+
+  const static auto route = std::format("{}/library/collections", BASE_ROUTE);
+  const json payload = {
+      {"title", title},
+  };
+
+  const auto result = perform_http_request_with_retry(
+      [&] { return http_client_.Post(route, payload.dump(), http_headers_); });
+  handle_result(result, [this, &movie_ids](const http::Response &response) {
+    const json response_json = json::parse(response.body, nullptr, false);
+    if (response_json.is_discarded()) {
+      print_error("Failed to parse JSON response");
+      return;
+    }
+
+    size_t collection_id;
+    if (const auto id = response_json.find("id"); id != response_json.end()) {
+      collection_id = *id;
+    } else {
+      print_error("'id' key not found in the response");
+      return;
+    }
+
+    const auto route = std::format("{}/library/collections/{}/movies",
+                                   BASE_ROUTE, collection_id);
+    size_t added_movies = 0;
+    // Add each movie to the collection
+    for (const auto &movie_id : movie_ids) {
+      const json payload = {
+          {"id", movie_id},
+      };
+      const auto result = perform_http_request_with_retry([&] {
+        return http_client_.Post(route, payload.dump(), http_headers_);
+      });
+      handle_result(
+          result,
+          [&added_movies](const http::Response &response) { ++added_movies; },
+          [](const http::Response &) {}, [](const http::Error) {});
+    }
+
+    if (added_movies == movie_ids.size()) {
+      print_success("Collection added successfully");
+    } else {
+      print_error(
+          std::format("Failed to add {} out of {} movies to the collection",
+                      movie_ids.size() - added_movies, movie_ids.size()));
+    }
+  });
+}
+
+void Cli::handle_delete_collection() {
+  size_t id;
+  if (auto arg_value = read_and_parse_arg_line<size_t>(line_buffer_, "id");
+      arg_value) {
+    id = *arg_value;
+  } else {
+    print_error("Invalid collection ID format. Expected 'id=<value>'");
+    return;
+  }
+
+  const auto route = std::format("{}/library/collections/{}", BASE_ROUTE, id);
+  const auto result = perform_http_request_with_retry(
+      [&] { return http_client_.Delete(route, http_headers_); });
+  handle_result(result, [](const http::Response &response) {
+    print_success("Collection deleted successfully");
+  });
+}
+
+void Cli::handle_add_movie_to_collection() {
+  size_t collection_id;
+  if (auto arg_value =
+          read_and_parse_arg_line<size_t>(line_buffer_, "collection_id");
+      arg_value) {
+    collection_id = *arg_value;
+  } else {
+    print_error(
+        "Invalid collection ID format. Expected 'collection_id=<value>'");
+    return;
+  }
+
+  size_t movie_id;
+  if (auto arg_value =
+          read_and_parse_arg_line<size_t>(line_buffer_, "movie_id");
+      arg_value) {
+    movie_id = *arg_value;
+  } else {
+    print_error("Invalid movie ID format. Expected 'movie_id=<value>'");
+    return;
+  }
+
+  const auto route = std::format("{}/library/collections/{}/movies", BASE_ROUTE,
+                                 collection_id);
+  const json payload = {
+      {"id", movie_id},
+  };
+  const auto result = perform_http_request_with_retry(
+      [&] { return http_client_.Post(route, payload.dump(), http_headers_); });
+  handle_result(result, [](const http::Response &response) {
+    print_success("Movie added to collection successfully");
+  });
+}
+
+void Cli::handle_delete_movie_from_collection() {
+  size_t collection_id;
+  if (auto arg_value =
+          read_and_parse_arg_line<size_t>(line_buffer_, "collection_id");
+      arg_value) {
+    collection_id = *arg_value;
+  } else {
+    print_error(
+        "Invalid collection ID format. Expected 'collection_id=<value>'");
+    return;
+  }
+
+  size_t movie_id;
+  if (auto arg_value =
+          read_and_parse_arg_line<size_t>(line_buffer_, "movie_id");
+      arg_value) {
+    movie_id = *arg_value;
+  } else {
+    print_error("Invalid movie ID format. Expected 'movie_id=<value>'");
+    return;
+  }
+
+  const auto route = std::format("{}/library/collections/{}/movies/{}",
+                                 BASE_ROUTE, collection_id, movie_id);
+  const auto result = perform_http_request_with_retry(
+      [&] { return http_client_.Delete(route, http_headers_); });
+  handle_result(result, [](const http::Response &response) {
+    print_success("Movie deleted from collection successfully");
+  });
+}
+
 void Cli::handle_exit() { should_exit_ = true; }
 
 void Cli::run() {
@@ -691,6 +951,24 @@ void Cli::run() {
       break;
     case Command::DELETE_MOVIE:
       handle_delete_movie();
+      break;
+    case Command::GET_COLLECTIONS:
+      handle_get_collections();
+      break;
+    case Command::GET_COLLECTION:
+      handle_get_collection();
+      break;
+    case Command::ADD_COLLECTION:
+      handle_add_collection();
+      break;
+    case Command::DELETE_COLLECTION:
+      handle_delete_collection();
+      break;
+    case Command::ADD_MOVIE_TO_COLLECTION:
+      handle_add_movie_to_collection();
+      break;
+    case Command::DELETE_MOVIE_FROM_COLLECTION:
+      handle_delete_movie_from_collection();
       break;
     default:
       std::cerr << "Invalid command\n";

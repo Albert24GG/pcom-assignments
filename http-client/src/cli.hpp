@@ -33,6 +33,12 @@ private:
   void handle_add_movie();
   void handle_update_movie();
   void handle_delete_movie();
+  void handle_get_collections();
+  void handle_get_collection();
+  void handle_add_collection();
+  void handle_delete_collection();
+  void handle_add_movie_to_collection();
+  void handle_delete_movie_from_collection();
   void handle_exit();
 
   void
