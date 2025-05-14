@@ -9,7 +9,9 @@
 #include <cstring>
 #include <fcntl.h>
 #include <netdb.h>
+#include <optional>
 #include <poll.h>
+#include <string>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>

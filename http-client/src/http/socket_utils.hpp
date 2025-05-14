@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstddef>
 #include <span>
+#include <string>
 
 namespace http::detail {
 
