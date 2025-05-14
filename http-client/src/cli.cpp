@@ -281,8 +281,8 @@ void Cli::handle_get_users() {
         const auto username = (*users)[i].find("username");
         const auto password = (*users)[i].find("password");
         if (username != (*users)[i].end() && password != (*users)[i].end()) {
-          os << "#" << i + 1 << " " << username.value().get<std::string_view>()
-             << ":" << password.value().get<std::string_view>();
+          os << "#" << i + 1 << " " << username->get<std::string_view>() << ":"
+             << password->get<std::string_view>();
           if (i + 1 != users->size()) {
             os << "\n";
           }
@@ -429,7 +429,7 @@ void Cli::handle_get_access() {
       // Add the JWT token to the headers
       http_headers_.insert_or_assign(
           "Authorization",
-          fmt::format("Bearer {}", jwt_token.value().get<std::string_view>()));
+          fmt::format("Bearer {}", jwt_token->get<std::string_view>()));
     } else {
       print_error("'token' key not found in the response");
     }
@@ -456,7 +456,7 @@ void Cli::handle_get_movies() {
         const auto title = (*movies)[i].find("title");
         const auto id = (*movies)[i].find("id");
         if (title != (*movies)[i].end() && id != (*movies)[i].end()) {
-          os << "\n#" << *id << " " << *title;
+          os << "\n#" << *id << " " << title->get<std::string_view>();
         } else {
           print_error("Invalid movie data format");
           is_success = false;
@@ -639,13 +639,13 @@ void Cli::handle_get_collections() {
     if (const auto collections = response_json.find("collections");
         collections != response_json.end()) {
       std::ostringstream os;
-      os << "Collections retrieved successfully\n";
+      os << "Collections retrieved successfully";
       bool is_success = true;
       for (size_t i = 0; i < collections->size(); ++i) {
         const auto title = (*collections)[i].find("title");
         const auto id = (*collections)[i].find("id");
         if (title != (*collections)[i].end() && id != (*collections)[i].end()) {
-          os << "#" << *id << " " << *title;
+          os << "\n#" << *id << " " << title->get<std::string_view>();
           if (i + 1 != collections->size()) {
             os << "\n";
           }
@@ -693,14 +693,15 @@ void Cli::handle_get_collection() {
 
     if (title != response_json.end() && owner != response_json.end() &&
         movies != response_json.end()) {
-      os << "title: " << *title << "\n" << "owner: " << *owner;
+      os << "title: " << title->get<std::string_view>() << "\n"
+         << "owner: " << owner->get<std::string_view>() << "\n";
 
       for (size_t i = 0; i < movies->size(); ++i) {
         const auto title = (*movies)[i].find("title");
         const auto id = (*movies)[i].find("id");
 
         if (title != (*movies)[i].end() && id != (*movies)[i].end()) {
-          os << "\n#" << *id << ": " << *title;
+          os << "\n#" << *id << ": " << title->get<std::string_view>();
         } else {
           print_error("Invalid movie data format");
           is_success = false;
