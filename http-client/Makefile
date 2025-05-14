@@ -1,5 +1,5 @@
 CXXFLAGS=-Wall -Werror -Wno-unused-variable -std=c++20
-CPPFLAGS=-Iinclude -MMD -MP
+CPPFLAGS=-Iinclude -MMD -MP -DFMT_HEADER_ONLY
 CXX=g++
 
 LOGGING_SRC=src/logger.cpp

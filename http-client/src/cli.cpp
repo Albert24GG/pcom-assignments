@@ -1,9 +1,9 @@
 #include "cli.hpp"
 #include "ctre.hpp"
+#include "fmt/format.h"
 #include "http/client.hpp"
 #include "json.hpp"
 #include "logger.hpp"
-#include <format>
 #include <functional>
 #include <iostream>
 #include <type_traits>
@@ -172,11 +172,11 @@ void Cli::handle_result(
     const auto response_json =
         nlohmann::json::parse(response.body, nullptr, false);
     if (!response.body.empty() && !response_json.is_discarded()) {
-      print_error(std::format("{} - {}\n{}", response.status_code,
+      print_error(fmt::format("{} - {}\n{}", response.status_code,
                               response.status_message,
                               dump_json_pretty(response_json)));
     } else {
-      print_error(std::format("{} - {}", response.status_code,
+      print_error(fmt::format("{} - {}", response.status_code,
                               response.status_message));
     }
   };
@@ -206,7 +206,7 @@ void Cli::handle_login_admin() {
     return;
   }
 
-  const static auto route = std::format("{}/admin/login", BASE_ROUTE);
+  const static auto route = fmt::format("{}/admin/login", BASE_ROUTE);
   const json payload = {
       {"username", username},
       {"password", password},
@@ -248,7 +248,7 @@ void Cli::handle_add_user() {
     return;
   }
 
-  const static auto route = std::format("{}/admin/users", BASE_ROUTE);
+  const static auto route = fmt::format("{}/admin/users", BASE_ROUTE);
   const json payload = {
       {"username", username},
       {"password", password},
@@ -262,7 +262,7 @@ void Cli::handle_add_user() {
 }
 
 void Cli::handle_get_users() {
-  const static auto route = std::format("{}/admin/users", BASE_ROUTE);
+  const static auto route = fmt::format("{}/admin/users", BASE_ROUTE);
   const auto result = perform_http_request_with_retry(
       [&] { return http_client_.Get(route, http_headers_); });
   handle_result(result, [](const http::Response &response) {
@@ -311,7 +311,7 @@ void Cli::handle_delete_user() {
     return;
   }
 
-  const auto route = std::format("{}/admin/users/{}", BASE_ROUTE, username);
+  const auto route = fmt::format("{}/admin/users/{}", BASE_ROUTE, username);
   const auto result = perform_http_request_with_retry(
       [&] { return http_client_.Delete(route, http_headers_); });
   handle_result(result, [](const http::Response &response) {
@@ -320,7 +320,7 @@ void Cli::handle_delete_user() {
 }
 
 void Cli::handle_logout_admin() {
-  const static auto route = std::format("{}/admin/logout", BASE_ROUTE);
+  const static auto route = fmt::format("{}/admin/logout", BASE_ROUTE);
   const auto result = perform_http_request_with_retry(
       [&] { return http_client_.Get(route, http_headers_); });
   handle_result(result, [this](const http::Response &response) {
@@ -366,7 +366,7 @@ void Cli::handle_login_user() {
     return;
   }
 
-  const static auto route = std::format("{}/user/login", BASE_ROUTE);
+  const static auto route = fmt::format("{}/user/login", BASE_ROUTE);
   const json payload = {
       {"admin_username", admin_username},
       {"username", username},
@@ -390,7 +390,7 @@ void Cli::handle_login_user() {
 }
 
 void Cli::handle_logout_user() {
-  const static auto route = std::format("{}/user/logout", BASE_ROUTE);
+  const static auto route = fmt::format("{}/user/logout", BASE_ROUTE);
   const auto result = perform_http_request_with_retry(
       [&] { return http_client_.Get(route, http_headers_); });
   handle_result(result, [this](const http::Response &response) {
@@ -413,7 +413,7 @@ void Cli::handle_logout_user() {
 }
 
 void Cli::handle_get_access() {
-  const static auto route = std::format("{}/library/access", BASE_ROUTE);
+  const static auto route = fmt::format("{}/library/access", BASE_ROUTE);
   const auto result = perform_http_request_with_retry(
       [&] { return http_client_.Get(route, http_headers_); });
   handle_result(result, [this](const http::Response &response) {
@@ -429,7 +429,7 @@ void Cli::handle_get_access() {
       // Add the JWT token to the headers
       http_headers_.insert_or_assign(
           "Authorization",
-          std::format("Bearer {}", jwt_token.value().get<std::string_view>()));
+          fmt::format("Bearer {}", jwt_token.value().get<std::string_view>()));
     } else {
       print_error("'token' key not found in the response");
     }
@@ -437,7 +437,7 @@ void Cli::handle_get_access() {
 }
 
 void Cli::handle_get_movies() {
-  const static auto route = std::format("{}/library/movies", BASE_ROUTE);
+  const static auto route = fmt::format("{}/library/movies", BASE_ROUTE);
   const auto result = perform_http_request_with_retry(
       [&] { return http_client_.Get(route, http_headers_); });
   handle_result(result, [](const http::Response &response) {
@@ -482,7 +482,7 @@ void Cli::handle_get_movie() {
     return;
   }
 
-  const auto route = std::format("{}/library/movies/{}", BASE_ROUTE, id);
+  const auto route = fmt::format("{}/library/movies/{}", BASE_ROUTE, id);
   const auto result = perform_http_request_with_retry(
       [&] { return http_client_.Get(route, http_headers_); });
   handle_result(result, [](const http::Response &response) {
@@ -491,7 +491,7 @@ void Cli::handle_get_movie() {
       print_error("Failed to parse JSON response");
       return;
     }
-    print_success(std::format("Movie retrieved successfully\n{}",
+    print_success(fmt::format("Movie retrieved successfully\n{}",
                               dump_json_pretty(response_json)));
   });
 }
@@ -533,7 +533,7 @@ void Cli::handle_add_movie() {
     return;
   }
 
-  const static auto route = std::format("{}/library/movies", BASE_ROUTE);
+  const static auto route = fmt::format("{}/library/movies", BASE_ROUTE);
   const json payload = {
       {"title", title},
       {"year", year},
@@ -593,7 +593,7 @@ void Cli::handle_update_movie() {
     return;
   }
 
-  const auto route = std::format("{}/library/movies/{}", BASE_ROUTE, id);
+  const auto route = fmt::format("{}/library/movies/{}", BASE_ROUTE, id);
   const json payload = {
       {"title", title},
       {"year", year},
@@ -617,7 +617,7 @@ void Cli::handle_delete_movie() {
     return;
   }
 
-  const auto route = std::format("{}/library/movies/{}", BASE_ROUTE, id);
+  const auto route = fmt::format("{}/library/movies/{}", BASE_ROUTE, id);
   const auto result = perform_http_request_with_retry(
       [&] { return http_client_.Delete(route, http_headers_); });
   handle_result(result, [](const http::Response &response) {
@@ -626,7 +626,7 @@ void Cli::handle_delete_movie() {
 }
 
 void Cli::handle_get_collections() {
-  const static auto route = std::format("{}/library/collections", BASE_ROUTE);
+  const static auto route = fmt::format("{}/library/collections", BASE_ROUTE);
   const auto result = perform_http_request_with_retry(
       [&] { return http_client_.Get(route, http_headers_); });
   handle_result(result, [](const http::Response &response) {
@@ -674,7 +674,7 @@ void Cli::handle_get_collection() {
     return;
   }
 
-  const auto route = std::format("{}/library/collections/{}", BASE_ROUTE, id);
+  const auto route = fmt::format("{}/library/collections/{}", BASE_ROUTE, id);
   const auto result = perform_http_request_with_retry(
       [&] { return http_client_.Get(route, http_headers_); });
   handle_result(result, [](const http::Response &response) {
@@ -743,7 +743,7 @@ void Cli::handle_add_collection() {
   for (size_t i = 0; i < num_movies; ++i) {
     size_t movie_id;
     if (auto arg_value = read_and_parse_arg_line<size_t>(
-            line_buffer_, std::format("movie_id[{}]", i));
+            line_buffer_, fmt::format("movie_id[{}]", i));
         arg_value) {
       movie_id = *arg_value;
       movie_ids.push_back(movie_id);
@@ -753,7 +753,7 @@ void Cli::handle_add_collection() {
     }
   }
 
-  const static auto route = std::format("{}/library/collections", BASE_ROUTE);
+  const static auto route = fmt::format("{}/library/collections", BASE_ROUTE);
   const json payload = {
       {"title", title},
   };
@@ -775,7 +775,7 @@ void Cli::handle_add_collection() {
       return;
     }
 
-    const auto route = std::format("{}/library/collections/{}/movies",
+    const auto route = fmt::format("{}/library/collections/{}/movies",
                                    BASE_ROUTE, collection_id);
     size_t added_movies = 0;
     // Add each movie to the collection
@@ -796,7 +796,7 @@ void Cli::handle_add_collection() {
       print_success("Collection added successfully");
     } else {
       print_error(
-          std::format("Failed to add {} out of {} movies to the collection",
+          fmt::format("Failed to add {} out of {} movies to the collection",
                       movie_ids.size() - added_movies, movie_ids.size()));
     }
   });
@@ -812,7 +812,7 @@ void Cli::handle_delete_collection() {
     return;
   }
 
-  const auto route = std::format("{}/library/collections/{}", BASE_ROUTE, id);
+  const auto route = fmt::format("{}/library/collections/{}", BASE_ROUTE, id);
   const auto result = perform_http_request_with_retry(
       [&] { return http_client_.Delete(route, http_headers_); });
   handle_result(result, [](const http::Response &response) {
@@ -842,7 +842,7 @@ void Cli::handle_add_movie_to_collection() {
     return;
   }
 
-  const auto route = std::format("{}/library/collections/{}/movies", BASE_ROUTE,
+  const auto route = fmt::format("{}/library/collections/{}/movies", BASE_ROUTE,
                                  collection_id);
   const json payload = {
       {"id", movie_id},
@@ -876,7 +876,7 @@ void Cli::handle_delete_movie_from_collection() {
     return;
   }
 
-  const auto route = std::format("{}/library/collections/{}/movies/{}",
+  const auto route = fmt::format("{}/library/collections/{}/movies/{}",
                                  BASE_ROUTE, collection_id, movie_id);
   const auto result = perform_http_request_with_retry(
       [&] { return http_client_.Delete(route, http_headers_); });
