@@ -63,7 +63,7 @@ Command from_str(std::string_view str) {
   return Command::INVALID;
 }
 
-constexpr auto SESSION_COOKIE_PATTERN = ctre::match<"session=[^;]*">;
+constexpr auto SESSION_COOKIE_FINDER = ctre::search<"session=[^;]*">;
 
 /**
  * Read a line from standard input and parse it into a key-value pair.
@@ -220,8 +220,7 @@ void Cli::handle_login_admin() {
     auto cookie_header = response.headers.find("Set-Cookie");
 
     if (cookie_header != response.headers.end()) {
-      auto session_cookie =
-          SESSION_COOKIE_PATTERN.search(cookie_header->second);
+      auto session_cookie = SESSION_COOKIE_FINDER(cookie_header->second);
       if (session_cookie) {
         http_headers_.insert_or_assign("Cookie", std::move(session_cookie));
       }
@@ -328,8 +327,7 @@ void Cli::handle_logout_admin() {
     // Remove the session cookie from the headers
     auto cookie_header = http_headers_.find("Cookie");
     if (cookie_header != http_headers_.end()) {
-      auto session_cookie =
-          SESSION_COOKIE_PATTERN.search(cookie_header->second);
+      auto session_cookie = SESSION_COOKIE_FINDER(cookie_header->second);
       if (session_cookie) {
         http_headers_.erase(cookie_header);
       }
@@ -380,8 +378,7 @@ void Cli::handle_login_user() {
     auto cookie_header = response.headers.find("Set-Cookie");
 
     if (cookie_header != response.headers.end()) {
-      auto session_cookie =
-          SESSION_COOKIE_PATTERN.search(cookie_header->second);
+      auto session_cookie = SESSION_COOKIE_FINDER(cookie_header->second);
       if (session_cookie) {
         http_headers_.insert_or_assign("Cookie", std::move(session_cookie));
       }
@@ -398,8 +395,7 @@ void Cli::handle_logout_user() {
     // Remove the session cookie from the headers
     auto cookie_header = http_headers_.find("Cookie");
     if (cookie_header != http_headers_.end()) {
-      auto session_cookie =
-          SESSION_COOKIE_PATTERN.search(cookie_header->second);
+      auto session_cookie = SESSION_COOKIE_FINDER(cookie_header->second);
       if (session_cookie) {
         http_headers_.erase(cookie_header);
       }
