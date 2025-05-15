@@ -1,6 +1,7 @@
 #include "client.hpp"
 
 #include "constants.hpp"
+#include "ctre.hpp"
 #include "error.hpp"
 #include "scope_guard.hpp"
 #include "socket.hpp"
@@ -163,35 +164,10 @@ auto Client::receive_response_data(Error &error) -> std::optional<std::string> {
   // Check for Content-Length
   {
     auto response_str_view = std::string_view(response_str);
-    auto content_length_header_start =
-        response_str_view.find("Content-Length: ");
-    if (content_length_header_start != std::string_view::npos) {
-      auto content_length_header_len =
-          response_str_view.substr(content_length_header_start).find("\r\n");
-
-      if (content_length_header_len != std::string_view::npos) {
-        auto content_length_header = response_str_view.substr(
-            content_length_header_start, content_length_header_len);
-        if (auto [whole, _, value] = HEADER_LINE_MATCHER(content_length_header);
-            whole) {
-          if (auto content_length_num = value.to_optional_number();
-              content_length_num) {
-            content_length = *content_length_num;
-          } else {
-            // Invalid Content-Length value
-            error = Error::Read;
-            return std::nullopt;
-          }
-        } else {
-          // Invalid Content-Length header
-          error = Error::Read;
-          return std::nullopt;
-        }
-      } else {
-        // Invalid Content-Length header
-        error = Error::Read;
-        return std::nullopt;
-      }
+    constexpr auto content_length_finder =
+        ctre::search<"content-length:\\s*(\\d+)", ctre::case_insensitive>;
+    if (auto [whole, len] = content_length_finder(response_str_view); whole) {
+      content_length = len.to_number();
     }
   }
 
