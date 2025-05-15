@@ -140,18 +140,29 @@ auto Client::receive_response_data(Error &error) -> std::optional<std::string> {
 
     auto received_data_view =
         std::string_view(reinterpret_cast<const char *>(buf.data()), bytes);
+    response_str.append(received_data_view);
     {
-      auto header_terminator_pos =
-          received_data_view.find(constants::HTTP_HEADER_TERMINATOR);
+      // Search the header terminator only in the last part of the response (if
+      // possible)
+      auto searchable_str_view = std::string_view(response_str);
+      if (response_str.length() >=
+          received_data_view.length() +
+              constants::HTTP_HEADER_TERMINATOR.length()) {
+        searchable_str_view = searchable_str_view.substr(
+            response_str.length() - received_data_view.length() -
+            constants::HTTP_HEADER_TERMINATOR.length());
+      }
+
+      const auto header_terminator_pos =
+          searchable_str_view.find(constants::HTTP_HEADER_TERMINATOR);
 
       if (header_terminator_pos != std::string_view::npos) {
         header_complete = true;
-        header_length = response_str.length() + header_terminator_pos +
+        header_length = response_str.length() - searchable_str_view.length() +
+                        header_terminator_pos +
                         constants::HTTP_HEADER_TERMINATOR.length();
       }
     }
-
-    response_str.append(received_data_view);
   }
 
   if (!header_complete) {
