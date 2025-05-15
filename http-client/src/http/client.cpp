@@ -10,6 +10,13 @@
 #include <sstream>
 #include <string_view>
 
+namespace http::detail {
+constexpr auto HEADER_LINE_MATCHER =
+    ctre::match<"^([A-Za-z0-9\\-]+):\\s*(.+)$">;
+constexpr auto STATUS_LINE_MATCHER =
+    ctre::match<"^(HTTP\\/1\\.[01])\\s(\\d{3})(?:\\s(.*?))$">;
+} // namespace http::detail
+
 namespace http {
 
 using namespace detail;
@@ -50,7 +57,7 @@ auto Response::from_str(std::string_view response_str)
   {
     auto status_line_view = response_str.substr(0, response_str.find("\r\n"));
     if (auto [whole, version, status_code, status_message] =
-            constants::STATUS_LINE_PAT(status_line_view);
+            STATUS_LINE_MATCHER(status_line_view);
         whole) {
       if (auto status_code_num = status_code.to_optional_number();
           status_code_num) {
@@ -77,8 +84,7 @@ auto Response::from_str(std::string_view response_str)
     }
 
     auto line_view = response_str.substr(0, line_end);
-    if (auto [whole, header, value] = constants::HEADER_LINE_PAT(line_view);
-        whole) {
+    if (auto [whole, header, value] = HEADER_LINE_MATCHER(line_view); whole) {
       res.headers.insert_or_assign(header.to_string(), value);
     } else {
       // Invalid header line
@@ -166,8 +172,7 @@ auto Client::receive_response_data(Error &error) -> std::optional<std::string> {
       if (content_length_header_len != std::string_view::npos) {
         auto content_length_header = response_str_view.substr(
             content_length_header_start, content_length_header_len);
-        if (auto [whole, _, value] =
-                constants::HEADER_LINE_PAT(content_length_header);
+        if (auto [whole, _, value] = HEADER_LINE_MATCHER(content_length_header);
             whole) {
           if (auto content_length_num = value.to_optional_number();
               content_length_num) {
