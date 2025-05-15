@@ -171,13 +171,14 @@ void Cli::handle_result(
   auto default_on_response_error = [](const http::Response &response) {
     const auto response_json =
         nlohmann::json::parse(response.body, nullptr, false);
-    if (!response.body.empty() && !response_json.is_discarded()) {
-      print_error(fmt::format("{} - {}\n{}", response.status_code,
+    if (!response.body.empty() && !response_json.is_discarded() &&
+        response_json.contains("error")) {
+      print_error(fmt::format("{}({}) - {}", response.status_code,
                               response.status_message,
-                              dump_json_pretty(response_json)));
+                              response_json["error"].get<std::string_view>()));
     } else {
-      print_error(fmt::format("{} - {}", response.status_code,
-                              response.status_message));
+      print_error(
+          fmt::format("{}({})", response.status_code, response.status_message));
     }
   };
 
