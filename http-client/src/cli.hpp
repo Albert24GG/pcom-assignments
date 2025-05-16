@@ -19,6 +19,7 @@ public:
   void run();
 
 private:
+  void handle_command(std::string_view command);
   // Command handlers
   void handle_login_admin();
   void handle_add_user();

@@ -9,60 +9,6 @@
 #include <type_traits>
 
 namespace {
-enum class Command {
-  LOGIN_ADMIN = 0,
-  ADD_USER,
-  GET_USERS,
-  DELETE_USER,
-  LOGOUT_ADMIN,
-  LOGIN_USER,
-  GET_ACCESS,
-  GET_MOVIES,
-  GET_MOVIE,
-  ADD_MOVIE,
-  DELETE_MOVIE,
-  UPDATE_MOVIE,
-  GET_COLLECTIONS,
-  GET_COLLECTION,
-  ADD_COLLECTION,
-  DELETE_COLLECTION,
-  ADD_MOVIE_TO_COLLECTION,
-  DELETE_MOVIE_FROM_COLLECTION,
-  LOGOUT_USER,
-  EXIT,
-  TOTAL_COMMANDS,
-  INVALID
-};
-
-Command from_str(std::string_view str) {
-  const static auto command_map = std::unordered_map<std::string_view, Command>{
-      {"login_admin", Command::LOGIN_ADMIN},
-      {"add_user", Command::ADD_USER},
-      {"get_users", Command::GET_USERS},
-      {"delete_user", Command::DELETE_USER},
-      {"logout_admin", Command::LOGOUT_ADMIN},
-      {"login", Command::LOGIN_USER},
-      {"get_access", Command::GET_ACCESS},
-      {"get_movies", Command::GET_MOVIES},
-      {"get_movie", Command::GET_MOVIE},
-      {"add_movie", Command::ADD_MOVIE},
-      {"delete_movie", Command::DELETE_MOVIE},
-      {"update_movie", Command::UPDATE_MOVIE},
-      {"get_collections", Command::GET_COLLECTIONS},
-      {"get_collection", Command::GET_COLLECTION},
-      {"add_collection", Command::ADD_COLLECTION},
-      {"delete_collection", Command::DELETE_COLLECTION},
-      {"add_movie_to_collection", Command::ADD_MOVIE_TO_COLLECTION},
-      {"delete_movie_from_collection", Command::DELETE_MOVIE_FROM_COLLECTION},
-      {"logout", Command::LOGOUT_USER},
-      {"exit", Command::EXIT}};
-  auto it = command_map.find(str);
-  if (it != command_map.end()) {
-    return it->second;
-  }
-  return Command::INVALID;
-}
-
 constexpr auto SESSION_COOKIE_FINDER = ctre::search<"session=[^;]*">;
 
 /**
@@ -190,6 +136,40 @@ void Cli::handle_result(
 }
 
 using json = nlohmann::json;
+
+void Cli::handle_command(std::string_view command){
+  const static auto str_to_cmd = std::unordered_map<std::string_view, void (Cli::*)()>{
+      {"login_admin", &Cli::handle_login_admin},
+      {"add_user", &Cli::handle_add_user},
+      {"get_users", &Cli::handle_get_users},
+      {"delete_user", &Cli::handle_delete_user},
+      {"logout_admin", &Cli::handle_logout_admin},
+      {"login", &Cli::handle_login_user},
+      {"logout", &Cli::handle_logout_user},
+      {"get_access", &Cli::handle_get_access},
+      {"get_movies", &Cli::handle_get_movies},
+      {"get_movie", &Cli::handle_get_movie},
+      {"add_movie", &Cli::handle_add_movie},
+      {"delete_movie", &Cli::handle_delete_movie},
+      {"update_movie", &Cli::handle_update_movie},
+      {"get_collections", &Cli::handle_get_collections},
+      {"get_collection", &Cli::handle_get_collection},
+      {"add_collection", &Cli::handle_add_collection},
+      {"delete_collection", &Cli::handle_delete_collection},
+      {"add_movie_to_collection",
+       &Cli::handle_add_movie_to_collection},
+      {"delete_movie_from_collection",
+       &Cli::handle_delete_movie_from_collection},
+      {"exit", &Cli::handle_exit},
+  };
+
+  if (auto it = str_to_cmd.find(command); it != str_to_cmd.end()) {
+    std::invoke(it->second, this);
+  } else {
+    throw std::invalid_argument(
+        fmt::format("Invalid command: {}", command));
+  }
+}
 
 void Cli::handle_login_admin() {
   std::string username =
@@ -717,72 +697,7 @@ void Cli::run() {
     } while (line_buffer_.empty());
 
     try {
-      auto command = from_str(line_buffer_);
-      switch (command) {
-      case Command::LOGIN_ADMIN:
-        handle_login_admin();
-        break;
-      case Command::EXIT:
-        handle_exit();
-        break;
-      case Command::ADD_USER:
-        handle_add_user();
-        break;
-      case Command::GET_USERS:
-        handle_get_users();
-        break;
-      case Command::DELETE_USER:
-        handle_delete_user();
-        break;
-      case Command::LOGOUT_ADMIN:
-        handle_logout_admin();
-        break;
-      case Command::LOGIN_USER:
-        handle_login_user();
-        break;
-      case Command::LOGOUT_USER:
-        handle_logout_user();
-        break;
-      case Command::GET_ACCESS:
-        handle_get_access();
-        break;
-      case Command::GET_MOVIES:
-        handle_get_movies();
-        break;
-      case Command::GET_MOVIE:
-        handle_get_movie();
-        break;
-      case Command::ADD_MOVIE:
-        handle_add_movie();
-        break;
-      case Command::UPDATE_MOVIE:
-        handle_update_movie();
-        break;
-      case Command::DELETE_MOVIE:
-        handle_delete_movie();
-        break;
-      case Command::GET_COLLECTIONS:
-        handle_get_collections();
-        break;
-      case Command::GET_COLLECTION:
-        handle_get_collection();
-        break;
-      case Command::ADD_COLLECTION:
-        handle_add_collection();
-        break;
-      case Command::DELETE_COLLECTION:
-        handle_delete_collection();
-        break;
-      case Command::ADD_MOVIE_TO_COLLECTION:
-        handle_add_movie_to_collection();
-        break;
-      case Command::DELETE_MOVIE_FROM_COLLECTION:
-        handle_delete_movie_from_collection();
-        break;
-      default:
-        std::cerr << "Invalid command\n";
-        break;
-      }
+      handle_command(line_buffer_);
     } catch (const std::exception &e) {
       print_error(e.what());
     }
