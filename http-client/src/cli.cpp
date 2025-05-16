@@ -6,6 +6,7 @@
 #include "logger.hpp"
 #include <functional>
 #include <iostream>
+#include <string_view>
 #include <type_traits>
 
 namespace {
@@ -25,8 +26,8 @@ constexpr auto SESSION_COOKIE_FINDER = ctre::search<"session=[^;]*">;
 template <typename ValueType = std::string>
 [[nodiscard]] ValueType
 read_and_parse_arg_line(std::string &line_buffer, std::string_view arg_name,
-                        std::string_view delimiter = "=") {
-  std::cout << arg_name << delimiter;
+                        std::function<bool (const ValueType&)> validator = [](const ValueType&) { return true; }) {
+  std::cout << arg_name << '=';
   std::flush(std::cout);
 
   do {
@@ -37,18 +38,28 @@ read_and_parse_arg_line(std::string &line_buffer, std::string_view arg_name,
     ValueType value{};
     if (auto [_, ec] = std::from_chars(
             line_buffer.data(), line_buffer.data() + line_buffer.size(), value);
-        ec == std::errc()) {
+        ec == std::errc() && validator(value)) {
       return value;
     } else {
       throw std::invalid_argument(
           fmt::format("Invalid value for field {}", arg_name));
     }
   } else if constexpr (std::is_constructible_v<ValueType, std::string>) {
-    return ValueType(line_buffer);
+    ValueType value(line_buffer);
+    if(validator(value)) {
+      return value;
+    } else {
+      throw std::invalid_argument(
+          fmt::format("Invalid value for field {}", arg_name));
+    }
   } else {
     static_assert(std::is_constructible_v<ValueType, std::string>,
                   "Unsupported type for read_and_parse_arg_line");
   }
+}
+
+bool has_no_spaces(const std::string &str) {
+  return str.find(' ') == std::string::npos;
 }
 
 /**
@@ -173,9 +184,10 @@ void Cli::handle_command(std::string_view command){
 
 void Cli::handle_login_admin() {
   std::string username =
-      read_and_parse_arg_line<std::string>(line_buffer_, "username");
+      read_and_parse_arg_line<std::string>(line_buffer_, "username",
+                                          has_no_spaces);
   std::string password =
-      read_and_parse_arg_line<std::string>(line_buffer_, "password");
+      read_and_parse_arg_line<std::string>(line_buffer_, "password", has_no_spaces);
 
   const static auto route = fmt::format("{}/admin/login", BASE_ROUTE);
   const json payload = {
@@ -201,9 +213,9 @@ void Cli::handle_login_admin() {
 
 void Cli::handle_add_user() {
   std::string username =
-      read_and_parse_arg_line<std::string>(line_buffer_, "username");
+      read_and_parse_arg_line<std::string>(line_buffer_, "username", has_no_spaces);
   std::string password =
-      read_and_parse_arg_line<std::string>(line_buffer_, "password");
+      read_and_parse_arg_line<std::string>(line_buffer_, "password", has_no_spaces);
 
   const static auto route = fmt::format("{}/admin/users", BASE_ROUTE);
   const json payload = {
@@ -260,7 +272,7 @@ void Cli::handle_get_users() {
 
 void Cli::handle_delete_user() {
   std::string username =
-      read_and_parse_arg_line<std::string>(line_buffer_, "username");
+      read_and_parse_arg_line<std::string>(line_buffer_, "username", has_no_spaces);
 
   const auto route = fmt::format("{}/admin/users/{}", BASE_ROUTE, username);
   const auto result = perform_http_request_with_retry(
@@ -289,11 +301,12 @@ void Cli::handle_logout_admin() {
 
 void Cli::handle_login_user() {
   std::string admin_username =
-      read_and_parse_arg_line<std::string>(line_buffer_, "admin_username");
+      read_and_parse_arg_line<std::string>(line_buffer_, "admin_username",
+                                          has_no_spaces);
   std::string username =
-      read_and_parse_arg_line<std::string>(line_buffer_, "username");
+      read_and_parse_arg_line<std::string>(line_buffer_, "username", has_no_spaces);
   std::string password =
-      read_and_parse_arg_line<std::string>(line_buffer_, "password");
+      read_and_parse_arg_line<std::string>(line_buffer_, "password", has_no_spaces);
 
   const static auto route = fmt::format("{}/user/login", BASE_ROUTE);
   const json payload = {
@@ -422,7 +435,9 @@ void Cli::handle_add_movie() {
   size_t year = read_and_parse_arg_line<size_t>(line_buffer_, "year");
   std::string description =
       read_and_parse_arg_line<std::string>(line_buffer_, "description");
-  double rating = read_and_parse_arg_line<double>(line_buffer_, "rating");
+  double rating = read_and_parse_arg_line<double>(line_buffer_, "rating", [](const double &value) {
+    return value >= 0.0 && value <= 10.0;
+  });
 
   const static auto route = fmt::format("{}/library/movies", BASE_ROUTE);
   const json payload = {
@@ -445,7 +460,9 @@ void Cli::handle_update_movie() {
   size_t year = read_and_parse_arg_line<size_t>(line_buffer_, "year");
   std::string description =
       read_and_parse_arg_line<std::string>(line_buffer_, "description");
-  double rating = read_and_parse_arg_line<double>(line_buffer_, "rating");
+  double rating = read_and_parse_arg_line<double>(line_buffer_, "rating", [](const double &value) {
+    return value >= 0.0 && value <= 10.0;
+  });
 
   const auto route = fmt::format("{}/library/movies/{}", BASE_ROUTE, id);
   const json payload = {
