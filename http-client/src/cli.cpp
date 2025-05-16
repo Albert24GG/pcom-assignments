@@ -685,6 +685,7 @@ void Cli::handle_exit() { should_exit_ = true; }
 void Cli::run() {
   // Use application/json as the default content type
   http_headers_.try_emplace("Content-Type", "application/json");
+  http_headers_.try_emplace("Accept", "application/json");
 
   // Enable logging for the HTTP client
   auto log_fn = [](const http::Request &req, const http::Response &res) {
