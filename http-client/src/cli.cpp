@@ -71,13 +71,15 @@ constexpr auto SESSION_COOKIE_FINDER = ctre::search<"session=[^;]*">;
  * @param line_buffer The buffer to store the input line.
  * @param arg_name The name of the argument to read.
  * @param delimiter The delimiter used to separate the key and value.
+ *
  * @return An optional pair of strings representing the key and value.
+ *
+ * @throws std::invalid_argument if the input format is invalid.
  */
 template <typename ValueType = std::string>
-[[nodiscard]] auto read_and_parse_arg_line(std::string &line_buffer,
-                                           std::string_view arg_name,
-                                           std::string_view delimiter = "=")
-    -> std::optional<ValueType> {
+[[nodiscard]] ValueType
+read_and_parse_arg_line(std::string &line_buffer, std::string_view arg_name,
+                        std::string_view delimiter = "=") {
   std::cout << arg_name << delimiter;
   std::flush(std::cout);
 
@@ -92,7 +94,8 @@ template <typename ValueType = std::string>
         ec == std::errc()) {
       return value;
     } else {
-      return std::nullopt;
+      throw std::invalid_argument(
+          fmt::format("Invalid value for field {}", arg_name));
     }
   } else if constexpr (std::is_constructible_v<ValueType, std::string>) {
     return ValueType(line_buffer);
@@ -189,23 +192,10 @@ void Cli::handle_result(
 using json = nlohmann::json;
 
 void Cli::handle_login_admin() {
-  std::string username;
-  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "username");
-      arg_value) {
-    username = std::move(*arg_value);
-  } else {
-    print_error("Invalid username format. Expected 'username=<value>'");
-    return;
-  }
-
-  std::string password;
-  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "password");
-      arg_value) {
-    password = std::move(*arg_value);
-  } else {
-    print_error("Invalid password format. Expected 'password=<value>'");
-    return;
-  }
+  std::string username =
+      read_and_parse_arg_line<std::string>(line_buffer_, "username");
+  std::string password =
+      read_and_parse_arg_line<std::string>(line_buffer_, "password");
 
   const static auto route = fmt::format("{}/admin/login", BASE_ROUTE);
   const json payload = {
@@ -230,23 +220,10 @@ void Cli::handle_login_admin() {
 }
 
 void Cli::handle_add_user() {
-  std::string username;
-  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "username");
-      arg_value) {
-    username = std::move(*arg_value);
-  } else {
-    print_error("Invalid username format. Expected 'username=<value>'");
-    return;
-  }
-
-  std::string password;
-  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "password");
-      arg_value) {
-    password = std::move(*arg_value);
-  } else {
-    print_error("Invalid password format. Expected 'password=<value>'");
-    return;
-  }
+  std::string username =
+      read_and_parse_arg_line<std::string>(line_buffer_, "username");
+  std::string password =
+      read_and_parse_arg_line<std::string>(line_buffer_, "password");
 
   const static auto route = fmt::format("{}/admin/users", BASE_ROUTE);
   const json payload = {
@@ -302,14 +279,8 @@ void Cli::handle_get_users() {
 }
 
 void Cli::handle_delete_user() {
-  std::string username;
-  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "username");
-      arg_value) {
-    username = std::move(*arg_value);
-  } else {
-    print_error("Invalid username format. Expected 'username=<value>'");
-    return;
-  }
+  std::string username =
+      read_and_parse_arg_line<std::string>(line_buffer_, "username");
 
   const auto route = fmt::format("{}/admin/users/{}", BASE_ROUTE, username);
   const auto result = perform_http_request_with_retry(
@@ -337,33 +308,12 @@ void Cli::handle_logout_admin() {
 }
 
 void Cli::handle_login_user() {
-  std::string admin_username;
-  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "admin_username");
-      arg_value) {
-    admin_username = std::move(*arg_value);
-  } else {
-    print_error(
-        "Invalid admin username format. Expected 'admin_username=<value>'");
-    return;
-  }
-
-  std::string username;
-  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "username");
-      arg_value) {
-    username = std::move(*arg_value);
-  } else {
-    print_error("Invalid username format. Expected 'username=<value>'");
-    return;
-  }
-
-  std::string password;
-  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "password");
-      arg_value) {
-    password = std::move(*arg_value);
-  } else {
-    print_error("Invalid password format. Expected 'password=<value>'");
-    return;
-  }
+  std::string admin_username =
+      read_and_parse_arg_line<std::string>(line_buffer_, "admin_username");
+  std::string username =
+      read_and_parse_arg_line<std::string>(line_buffer_, "username");
+  std::string password =
+      read_and_parse_arg_line<std::string>(line_buffer_, "password");
 
   const static auto route = fmt::format("{}/user/login", BASE_ROUTE);
   const json payload = {
@@ -470,14 +420,7 @@ void Cli::handle_get_movies() {
 }
 
 void Cli::handle_get_movie() {
-  size_t id;
-  if (auto arg_value = read_and_parse_arg_line<size_t>(line_buffer_, "id");
-      arg_value) {
-    id = *arg_value;
-  } else {
-    print_error("Invalid movie ID format. Expected 'id=<value>'");
-    return;
-  }
+  size_t id = read_and_parse_arg_line<size_t>(line_buffer_, "id");
 
   const auto route = fmt::format("{}/library/movies/{}", BASE_ROUTE, id);
   const auto result = perform_http_request_with_retry(
@@ -494,41 +437,12 @@ void Cli::handle_get_movie() {
 }
 
 void Cli::handle_add_movie() {
-  std::string title;
-  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "title");
-      arg_value) {
-    title = std::move(*arg_value);
-  } else {
-    print_error("Invalid title format. Expected 'title=<value>'");
-    return;
-  }
-
-  size_t year;
-  if (auto arg_value = read_and_parse_arg_line<size_t>(line_buffer_, "year");
-      arg_value) {
-    year = *arg_value;
-  } else {
-    print_error("Invalid year format. Expected 'year=<value>'");
-    return;
-  }
-
-  std::string description;
-  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "description");
-      arg_value) {
-    description = std::move(*arg_value);
-  } else {
-    print_error("Invalid description format. Expected 'description=<value>'");
-    return;
-  }
-
-  double rating;
-  if (auto arg_value = read_and_parse_arg_line<double>(line_buffer_, "rating");
-      arg_value) {
-    rating = *arg_value;
-  } else {
-    print_error("Invalid rating format. Expected 'rating=<value>'");
-    return;
-  }
+  std::string title =
+      read_and_parse_arg_line<std::string>(line_buffer_, "title");
+  size_t year = read_and_parse_arg_line<size_t>(line_buffer_, "year");
+  std::string description =
+      read_and_parse_arg_line<std::string>(line_buffer_, "description");
+  double rating = read_and_parse_arg_line<double>(line_buffer_, "rating");
 
   const static auto route = fmt::format("{}/library/movies", BASE_ROUTE);
   const json payload = {
@@ -545,50 +459,13 @@ void Cli::handle_add_movie() {
 }
 
 void Cli::handle_update_movie() {
-  size_t id;
-  if (auto arg_value = read_and_parse_arg_line<size_t>(line_buffer_, "id");
-      arg_value) {
-    id = *arg_value;
-  } else {
-    print_error("Invalid movie ID format. Expected 'id=<value>'");
-    return;
-  }
-
-  std::string title;
-  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "title");
-      arg_value) {
-    title = std::move(*arg_value);
-  } else {
-    print_error("Invalid title format. Expected 'title=<value>'");
-    return;
-  }
-
-  size_t year;
-  if (auto arg_value = read_and_parse_arg_line<size_t>(line_buffer_, "year");
-      arg_value) {
-    year = *arg_value;
-  } else {
-    print_error("Invalid year format. Expected 'year=<value>'");
-    return;
-  }
-
-  std::string description;
-  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "description");
-      arg_value) {
-    description = std::move(*arg_value);
-  } else {
-    print_error("Invalid description format. Expected 'description=<value>'");
-    return;
-  }
-
-  double rating;
-  if (auto arg_value = read_and_parse_arg_line<double>(line_buffer_, "rating");
-      arg_value) {
-    rating = *arg_value;
-  } else {
-    print_error("Invalid rating format. Expected 'rating=<value>'");
-    return;
-  }
+  size_t id = read_and_parse_arg_line<size_t>(line_buffer_, "id");
+  std::string title =
+      read_and_parse_arg_line<std::string>(line_buffer_, "title");
+  size_t year = read_and_parse_arg_line<size_t>(line_buffer_, "year");
+  std::string description =
+      read_and_parse_arg_line<std::string>(line_buffer_, "description");
+  double rating = read_and_parse_arg_line<double>(line_buffer_, "rating");
 
   const auto route = fmt::format("{}/library/movies/{}", BASE_ROUTE, id);
   const json payload = {
@@ -605,14 +482,7 @@ void Cli::handle_update_movie() {
 }
 
 void Cli::handle_delete_movie() {
-  size_t id;
-  if (auto arg_value = read_and_parse_arg_line<size_t>(line_buffer_, "id");
-      arg_value) {
-    id = *arg_value;
-  } else {
-    print_error("Invalid movie ID format. Expected 'id=<value>'");
-    return;
-  }
+  size_t id = read_and_parse_arg_line<size_t>(line_buffer_, "id");
 
   const auto route = fmt::format("{}/library/movies/{}", BASE_ROUTE, id);
   const auto result = perform_http_request_with_retry(
@@ -662,14 +532,7 @@ void Cli::handle_get_collections() {
 }
 
 void Cli::handle_get_collection() {
-  size_t id;
-  if (auto arg_value = read_and_parse_arg_line<size_t>(line_buffer_, "id");
-      arg_value) {
-    id = *arg_value;
-  } else {
-    print_error("Invalid collection ID format. Expected 'id=<value>'");
-    return;
-  }
+  size_t id = read_and_parse_arg_line<size_t>(line_buffer_, "id");
 
   const auto route = fmt::format("{}/library/collections/{}", BASE_ROUTE, id);
   const auto result = perform_http_request_with_retry(
@@ -717,38 +580,16 @@ void Cli::handle_get_collection() {
 }
 
 void Cli::handle_add_collection() {
-  std::string title;
-  if (auto arg_value = read_and_parse_arg_line(line_buffer_, "title");
-      arg_value) {
-    title = std::move(*arg_value);
-  } else {
-    print_error("Invalid title format. Expected 'title=<value>'");
-    return;
-  }
-
-  size_t num_movies;
-  if (auto arg_value =
-          read_and_parse_arg_line<size_t>(line_buffer_, "num_movies");
-      arg_value) {
-    num_movies = *arg_value;
-  } else {
-    print_error(
-        "Invalid number of movies format. Expected 'num_movies=<value>'");
-    return;
-  }
+  std::string title =
+      read_and_parse_arg_line<std::string>(line_buffer_, "title");
+  size_t num_movies =
+      read_and_parse_arg_line<size_t>(line_buffer_, "num_movies");
 
   std::vector<size_t> movie_ids;
   for (size_t i = 0; i < num_movies; ++i) {
-    size_t movie_id;
-    if (auto arg_value = read_and_parse_arg_line<size_t>(
-            line_buffer_, fmt::format("movie_id[{}]", i));
-        arg_value) {
-      movie_id = *arg_value;
-      movie_ids.push_back(movie_id);
-    } else {
-      print_error("Invalid movie ID format. Expected 'movie_id=<value>'");
-      return;
-    }
+    size_t movie_id = read_and_parse_arg_line<size_t>(
+        line_buffer_, fmt::format("movie_id[{}]", i));
+    movie_ids.push_back(movie_id);
   }
 
   const static auto route = fmt::format("{}/library/collections", BASE_ROUTE);
@@ -801,14 +642,7 @@ void Cli::handle_add_collection() {
 }
 
 void Cli::handle_delete_collection() {
-  size_t id;
-  if (auto arg_value = read_and_parse_arg_line<size_t>(line_buffer_, "id");
-      arg_value) {
-    id = *arg_value;
-  } else {
-    print_error("Invalid collection ID format. Expected 'id=<value>'");
-    return;
-  }
+  size_t id = read_and_parse_arg_line<size_t>(line_buffer_, "id");
 
   const auto route = fmt::format("{}/library/collections/{}", BASE_ROUTE, id);
   const auto result = perform_http_request_with_retry(
@@ -819,26 +653,9 @@ void Cli::handle_delete_collection() {
 }
 
 void Cli::handle_add_movie_to_collection() {
-  size_t collection_id;
-  if (auto arg_value =
-          read_and_parse_arg_line<size_t>(line_buffer_, "collection_id");
-      arg_value) {
-    collection_id = *arg_value;
-  } else {
-    print_error(
-        "Invalid collection ID format. Expected 'collection_id=<value>'");
-    return;
-  }
-
-  size_t movie_id;
-  if (auto arg_value =
-          read_and_parse_arg_line<size_t>(line_buffer_, "movie_id");
-      arg_value) {
-    movie_id = *arg_value;
-  } else {
-    print_error("Invalid movie ID format. Expected 'movie_id=<value>'");
-    return;
-  }
+  size_t collection_id =
+      read_and_parse_arg_line<size_t>(line_buffer_, "collection_id");
+  size_t movie_id = read_and_parse_arg_line<size_t>(line_buffer_, "movie_id");
 
   const auto route = fmt::format("{}/library/collections/{}/movies", BASE_ROUTE,
                                  collection_id);
@@ -853,26 +670,9 @@ void Cli::handle_add_movie_to_collection() {
 }
 
 void Cli::handle_delete_movie_from_collection() {
-  size_t collection_id;
-  if (auto arg_value =
-          read_and_parse_arg_line<size_t>(line_buffer_, "collection_id");
-      arg_value) {
-    collection_id = *arg_value;
-  } else {
-    print_error(
-        "Invalid collection ID format. Expected 'collection_id=<value>'");
-    return;
-  }
-
-  size_t movie_id;
-  if (auto arg_value =
-          read_and_parse_arg_line<size_t>(line_buffer_, "movie_id");
-      arg_value) {
-    movie_id = *arg_value;
-  } else {
-    print_error("Invalid movie ID format. Expected 'movie_id=<value>'");
-    return;
-  }
+  size_t collection_id =
+      read_and_parse_arg_line<size_t>(line_buffer_, "collection_id");
+  size_t movie_id = read_and_parse_arg_line<size_t>(line_buffer_, "movie_id");
 
   const auto route = fmt::format("{}/library/collections/{}/movies/{}",
                                  BASE_ROUTE, collection_id, movie_id);
@@ -916,71 +716,75 @@ void Cli::run() {
       std::getline(std::cin, line_buffer_);
     } while (line_buffer_.empty());
 
-    auto command = from_str(line_buffer_);
-    switch (command) {
-    case Command::LOGIN_ADMIN:
-      handle_login_admin();
-      break;
-    case Command::EXIT:
-      handle_exit();
-      break;
-    case Command::ADD_USER:
-      handle_add_user();
-      break;
-    case Command::GET_USERS:
-      handle_get_users();
-      break;
-    case Command::DELETE_USER:
-      handle_delete_user();
-      break;
-    case Command::LOGOUT_ADMIN:
-      handle_logout_admin();
-      break;
-    case Command::LOGIN_USER:
-      handle_login_user();
-      break;
-    case Command::LOGOUT_USER:
-      handle_logout_user();
-      break;
-    case Command::GET_ACCESS:
-      handle_get_access();
-      break;
-    case Command::GET_MOVIES:
-      handle_get_movies();
-      break;
-    case Command::GET_MOVIE:
-      handle_get_movie();
-      break;
-    case Command::ADD_MOVIE:
-      handle_add_movie();
-      break;
-    case Command::UPDATE_MOVIE:
-      handle_update_movie();
-      break;
-    case Command::DELETE_MOVIE:
-      handle_delete_movie();
-      break;
-    case Command::GET_COLLECTIONS:
-      handle_get_collections();
-      break;
-    case Command::GET_COLLECTION:
-      handle_get_collection();
-      break;
-    case Command::ADD_COLLECTION:
-      handle_add_collection();
-      break;
-    case Command::DELETE_COLLECTION:
-      handle_delete_collection();
-      break;
-    case Command::ADD_MOVIE_TO_COLLECTION:
-      handle_add_movie_to_collection();
-      break;
-    case Command::DELETE_MOVIE_FROM_COLLECTION:
-      handle_delete_movie_from_collection();
-      break;
-    default:
-      std::cerr << "Invalid command\n";
-      break;
+    try {
+      auto command = from_str(line_buffer_);
+      switch (command) {
+      case Command::LOGIN_ADMIN:
+        handle_login_admin();
+        break;
+      case Command::EXIT:
+        handle_exit();
+        break;
+      case Command::ADD_USER:
+        handle_add_user();
+        break;
+      case Command::GET_USERS:
+        handle_get_users();
+        break;
+      case Command::DELETE_USER:
+        handle_delete_user();
+        break;
+      case Command::LOGOUT_ADMIN:
+        handle_logout_admin();
+        break;
+      case Command::LOGIN_USER:
+        handle_login_user();
+        break;
+      case Command::LOGOUT_USER:
+        handle_logout_user();
+        break;
+      case Command::GET_ACCESS:
+        handle_get_access();
+        break;
+      case Command::GET_MOVIES:
+        handle_get_movies();
+        break;
+      case Command::GET_MOVIE:
+        handle_get_movie();
+        break;
+      case Command::ADD_MOVIE:
+        handle_add_movie();
+        break;
+      case Command::UPDATE_MOVIE:
+        handle_update_movie();
+        break;
+      case Command::DELETE_MOVIE:
+        handle_delete_movie();
+        break;
+      case Command::GET_COLLECTIONS:
+        handle_get_collections();
+        break;
+      case Command::GET_COLLECTION:
+        handle_get_collection();
+        break;
+      case Command::ADD_COLLECTION:
+        handle_add_collection();
+        break;
+      case Command::DELETE_COLLECTION:
+        handle_delete_collection();
+        break;
+      case Command::ADD_MOVIE_TO_COLLECTION:
+        handle_add_movie_to_collection();
+        break;
+      case Command::DELETE_MOVIE_FROM_COLLECTION:
+        handle_delete_movie_from_collection();
+        break;
+      default:
+        std::cerr << "Invalid command\n";
+        break;
+      }
+    } catch (const std::exception &e) {
+      print_error(e.what());
     }
   }
 
