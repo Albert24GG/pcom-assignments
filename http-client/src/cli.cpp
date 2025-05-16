@@ -8,6 +8,7 @@
 #include <iostream>
 #include <string_view>
 #include <type_traits>
+#include <thread>
 
 namespace {
 constexpr auto SESSION_COOKIE_FINDER = ctre::search<"session=[^;]*">;
